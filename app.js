@@ -138,14 +138,31 @@
      dashboard feels alive without ever doing a full page reload or spawning
      new intervals. */
   function runLiveSimulationTick() {
-    // Perturb sensor temperature slightly for 2-3 random SPPG
-    for (let i = 0; i < 3; i++) {
+    // Perturb sensors/production/distribution for a wider slice of SPPG
+    // each tick so more of the dashboard — not just the map — visibly
+    // moves between updates (was 3 SPPG; a national command center with
+    // only 3 of 300 kitchens ever changing read as frozen).
+    lastChangedSppgIds = new Set();
+    const perturbCount = 6;
+    for (let i = 0; i < perturbCount; i++) {
       const s = SPPG_DATA[Math.floor(Math.random() * SPPG_DATA.length)];
+      lastChangedSppgIds.add(s.id);
       s.sensors.temperature = +clamp1(s.sensors.temperature + (Math.random() - 0.5) * 0.6, 0, 14).toFixed(1);
+      s.sensors.humidity = +clamp1(s.sensors.humidity + (Math.random() - 0.5) * 2, 30, 85).toFixed(0);
       if (s.production.produced < s.production.target) {
         s.production.produced = Math.min(s.production.target, s.production.produced + Math.floor(Math.random() * 6));
         s.production.completion = +((s.production.produced / s.production.target) * 100).toFixed(1);
       }
+      if (s.distribution.delivered < s.distribution.target) {
+        s.distribution.delivered = Math.min(s.distribution.target, s.distribution.delivered + Math.floor(Math.random() * 4));
+        s.distribution.completion = +((s.distribution.delivered / s.distribution.target) * 100).toFixed(1);
+      }
+      // Small chance a delayed distribution catches up, or an on-time one
+      // slips — keeps "Distribusi tertunda" style alerts from being static.
+      if (s.distribution.delayed > 0 && Math.random() < 0.3) s.distribution.delayed = Math.max(0, s.distribution.delayed - 1);
+      else if (s.distribution.delayed === 0 && Math.random() < 0.05) s.distribution.delayed += 1;
+      if (s.cctv.camerasOnline < s.cctv.camerasTotal && Math.random() < 0.4) s.cctv.camerasOnline++;
+      else if (s.cctv.camerasOnline > 0 && Math.random() < 0.03) s.cctv.camerasOnline--;
       const derived = deriveSPPGStatus(s);
       s.status = derived.status; s.riskScore = derived.riskScore; s.riskBreakdown = derived.breakdown;
     }
@@ -164,10 +181,19 @@
     }
     if (alertsChanged && typeof refreshAlertUI === "function") refreshAlertUI();
 
-    // Re-render currently visible view's live-ish widgets cheaply
-    if (state.view === "overview") { renderStatsAndSummary(); renderCriticalStrip(); renderAttention(); }
+    // Re-render currently visible view's live-ish widgets cheaply.
+    // renderOps()/renderMiniMap() were previously only called once at
+    // startup — the "Live Operations" list and the Overview mini-map sat
+    // frozen forever after the first paint even while everything else on
+    // the dashboard kept moving. Now they refresh with the same 20s tick.
+    if (state.view === "overview") { renderStatsAndSummary(); renderCriticalStrip(); renderAttention(); renderOps(); renderMiniMap(); }
     if (state.view === "map") renderLargeMap();
     if (state.view === "risk") renderRiskCenter();
+    if (state.view === "cctv") renderCCTV();
+    // Sensor IoT grid lives inside the Distribusi view (id="sensorGrid"),
+    // not a standalone "sensor" view — the admin dashboard has no such
+    // view name, so guarding on it would silently never fire.
+    if (state.view === "distribution") renderSensors();
   }
   function clamp1(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
 
@@ -300,6 +326,13 @@
   /* =======================================================================
      DASHBOARD — Operational Summary + Stats
      ======================================================================= */
+  const STAT_ICONS = {
+    "accent-gold": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>',
+    "accent-green": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>',
+    "accent-cyan": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.4"/><path d="M12 3v2.4M12 18.6V21M21 12h-2.4M5.4 12H3"/></svg>',
+    "accent-orange": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
+    "accent-red": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+  };
   function renderStatsAndSummary() {
     const counts = { normal: 0, monitoring: 0, warning: 0, critical: 0, offline: 0 };
     SPPG_DATA.forEach((s) => counts[s.status]++);
@@ -313,7 +346,14 @@
     ];
     const grid = document.getElementById("statsGrid");
     grid.innerHTML = "";
-    STATS.forEach((s) => grid.appendChild(el(`<div class="stat-card ${s.cls}"><span class="stat-label">${s.label}</span><span class="stat-value" data-target="${s.value}">0</span></div>`)));
+    STATS.forEach((s) => {
+      const share = Math.min(100, Math.round((s.value / NATIONAL_SIMULATION.totalSPPG) * 100));
+      grid.appendChild(el(`<div class="stat-card ${s.cls}">
+        <div class="stat-top"><span class="stat-icon">${STAT_ICONS[s.cls]}</span><span class="stat-label">${s.label}</span></div>
+        <span class="stat-value" data-target="${s.value}">0</span>
+        <div class="stat-bar"><span style="width:${share}%"></span></div>
+      </div>`));
+    });
     animateCounters();
 
     document.getElementById("demoCountBadge").textContent = `DATA DEMO: ${SPPG_DATA.length} SPPG dimuat di browser ini`;
@@ -437,6 +477,87 @@
   let popupEl = null;
   function closePopup() { if (popupEl) { popupEl.remove(); popupEl = null; } }
 
+  /* ---------- Live map animation helpers -------------------------------
+     Native SVG animation (animateMotion / animateTransform) is used for
+     the "moving convoy" and radar-sweep effects instead of a JS/rAF loop:
+     zero per-frame CPU cost, runs entirely on the compositor, and is
+     trivially removed by discarding the SVG (no interval to leak). This
+     keeps the "peta lebih aktif" request compatible with the project's
+     own performance rules (section 28 of the design brief: no heavy JS
+     animation loops). */
+  function prefersReducedMotion() {
+    return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  }
+  // Deterministic-ish pseudo-random pair selection so routes don't jump
+  // wildly between the many re-renders that happen every ~20s; reseeded
+  // only when the underlying dataset identity changes size (filter change).
+  function buildRouteAnimations(dataset, uid) {
+    if (prefersReducedMotion() || dataset.length < 2) return "";
+    const usable = dataset.filter((s) => s.status !== "offline");
+    if (usable.length < 2) return "";
+    const pairCount = Math.min(7, Math.max(2, Math.floor(usable.length / 12)));
+    const pairs = [];
+    // Route any active warning/critical SPPG to its nearest normal/monitoring
+    // "hub" — reads as "bantuan/tim sedang menuju lokasi", which is more
+    // narratively meaningful than fully random lines.
+    const hubs = usable.filter((s) => s.status === "normal" || s.status === "monitoring");
+    const needing = usable.filter((s) => s.status === "warning" || s.status === "critical").slice(0, Math.ceil(pairCount / 2));
+    needing.forEach((s) => {
+      if (!hubs.length) return;
+      let nearest = hubs[0], best = Infinity;
+      hubs.forEach((h) => {
+        const d = (h.lat - s.lat) ** 2 + (h.lng - s.lng) ** 2;
+        if (d < best) { best = d; nearest = h; }
+      });
+      pairs.push([nearest, s, "alert"]);
+    });
+    // Fill the rest with routine distribution routes between nearby normal
+    // hubs, seeded from dataset order so it's stable within a single
+    // render pass.
+    for (let i = 0; pairs.length < pairCount && i < hubs.length - 1; i += 3) {
+      pairs.push([hubs[i], hubs[i + 1], "routine"]);
+    }
+    if (!pairs.length) return "";
+    let svg = `<g class="map-routes" aria-hidden="true">`;
+    pairs.forEach(([a, b, kind], i) => {
+      const p1 = project(a.lat, a.lng), p2 = project(b.lat, b.lng);
+      const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2 - 8; // slight arc
+      const pathId = `${uid}-route${i}`;
+      const dur = (kind === "alert" ? 2.4 : 3.6) + (i % 4) * 0.6;
+      const color = kind === "alert" ? "var(--accent-orange)" : "var(--accent-cyan)";
+      svg += `
+        <path id="${pathId}" class="map-route-line ${kind === "alert" ? "is-alert" : ""}" d="M ${p1.x},${p1.y} Q ${mx},${my} ${p2.x},${p2.y}" fill="none"/>
+        <circle r="${kind === "alert" ? 2.2 : 1.7}" class="map-convoy-dot" fill="${color}">
+          <animateMotion dur="${dur}s" repeatCount="indefinite" rotate="auto">
+            <mpath href="#${pathId}"/>
+          </animateMotion>
+        </circle>`;
+    });
+    svg += `</g>`;
+    return svg;
+  }
+  // Slow rotating radar sweep centered on the map — pure decoration,
+  // reinforces the "command center" read without any JS timer.
+  function buildRadarSweep(uid) {
+    if (prefersReducedMotion()) return "";
+    const cx = MAP_W / 2, cy = MAP_H / 2, r = Math.max(MAP_W, MAP_H) * 0.6;
+    return `
+      <g class="map-radar" aria-hidden="true">
+        <path d="M ${cx},${cy} L ${cx + r},${cy} A ${r},${r} 0 0 1 ${cx + r * Math.cos(0.5)},${cy + r * Math.sin(0.5)} Z"
+              fill="url(#${uid}-radarGradient)">
+          <animateTransform attributeName="transform" type="rotate" from="0 ${cx} ${cy}" to="360 ${cx} ${cy}" dur="9s" repeatCount="indefinite"/>
+        </path>
+      </g>`;
+  }
+  // IDs perturbed by the most recent 20s simulation tick — rendered with a
+  // one-shot "ping" ring so the map visibly reacts to new data instead of
+  // only ever showing a frozen snapshot.
+  let lastChangedSppgIds = new Set();
+  // Pan/zoom is preserved across re-renders (the live tick used to rebuild
+  // the whole SVG every 20s and silently reset any zoom/pan the user had
+  // set — fixed by keeping this state outside the render function).
+  const mapViewState = { large: { scale: 1, tx: 0, ty: 0 }, mini: { scale: 1, tx: 0, ty: 0 } };
+
   // Every call gets its own gradient/filter IDs. Without this, the Overview
   // mini map and the full Peta map (both built by this same function, both
   // present in the DOM at once behind [hidden]) would define <linearGradient
@@ -453,8 +574,10 @@
       const color = statusColorVar(s.status);
       const ring = (s.status === "critical" || s.status === "warning")
         ? `<circle class="pulse-ring" cx="${x}" cy="${y}" r="4" fill="none" stroke="${color}" stroke-width="1.4"/>` : "";
+      const justUpdated = lastChangedSppgIds.has(s.id)
+        ? `<circle class="marker-ping" cx="${x}" cy="${y}" r="4" fill="none" stroke="${color}" stroke-width="2"/>` : "";
       return `<g class="map-marker" data-id="${s.id}" tabindex="0" role="button" aria-label="${escapeHtml(s.name)}">
-        ${ring}<circle class="marker-shadow" cx="${x}" cy="${y + 1}" r="${opts.large ? 5 : 4}" fill="rgba(0,0,0,.35)"/>
+        ${ring}${justUpdated}<circle class="marker-shadow" cx="${x}" cy="${y + 1}" r="${opts.large ? 5 : 4}" fill="rgba(0,0,0,.35)"/>
         <circle cx="${x}" cy="${y}" r="${opts.large ? 5 : 4}" fill="${color}" stroke="rgba(0,0,0,.45)" stroke-width="0.6"/>
         <circle cx="${x - (opts.large ? 1.6 : 1.3)}" cy="${y - (opts.large ? 1.6 : 1.3)}" r="${opts.large ? 1.4 : 1.1}" fill="rgba(255,255,255,.55)"/>
       </g>`;
@@ -467,7 +590,9 @@
     const shapes = `
       <path d="${INDONESIA_LAND_PATH}" fill="none" stroke="var(--map-land-glow)" stroke-width="5" opacity="0.55" filter="url(#${uid}-landBlur)"/>
       <path d="${INDONESIA_LAND_PATH}" fill="url(#${uid}-landGradient)" stroke="var(--map-land-stroke)" stroke-width="1.1" stroke-linejoin="round" filter="url(#${uid}-landShadow)"/>`;
-    return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" role="img" aria-label="Peta sebaran SPPG Indonesia (simulasi)">
+    const radar = buildRadarSweep(uid);
+    const routes = buildRouteAnimations(dataset, uid);
+    return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" role="img" aria-label="Peta sebaran SPPG Indonesia (simulasi, dengan simulasi pergerakan distribusi)">
       <defs>
         <linearGradient id="${uid}-seaGradient" x1="0" y1="0" x2="0.3" y2="1">
           <stop offset="0%" stop-color="var(--map-sea-top)"/>
@@ -487,12 +612,18 @@
         <filter id="${uid}-landBlur" x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur stdDeviation="5"/>
         </filter>
+        <linearGradient id="${uid}-radarGradient" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="var(--accent-cyan)" stop-opacity="0.14"/>
+          <stop offset="100%" stop-color="var(--accent-cyan)" stop-opacity="0"/>
+        </linearGradient>
       </defs>
       <g class="map-zoom-group">
         <rect x="0" y="0" width="${MAP_W}" height="${MAP_H}" fill="url(#${uid}-seaGradient)"/>
         <rect x="0" y="0" width="${MAP_W}" height="${MAP_H}" fill="url(#${uid}-seaVignette)"/>
         <g class="map-graticule">${graticule.join("")}</g>
         ${shapes}
+        ${radar}
+        ${routes}
         ${markers}
       </g>
     </svg>`;
@@ -514,7 +645,7 @@
             <div class="row"><span>Risk Score</span><strong>${sppg.riskScore} / 100</strong></div>
             <div class="row"><span>CCTV</span><strong>${sppg.cctv.status.toUpperCase()}</strong></div>
             <div class="row"><span>Distribusi</span><strong>${sppg.distribution.delayed > 0 ? "TERLAMBAT" : "ON TIME"}</strong></div>
-            <div class="row"><span>Last Update</span><strong>08:32 WIB</strong></div>
+            <div class="row"><span>Last Update</span><strong>${new Date().toLocaleTimeString("id-ID", { hour12: false })} WIB</strong></div>
             <button class="btn-ghost" data-open-detail="${sppg.id}" style="width:100%;margin-top:8px">LIHAT DETAIL</button>
           </div>`);
         container.style.position = "relative";
@@ -542,13 +673,24 @@
     container.addEventListener("click", (e) => { if (!e.target.closest(".map-marker") && !e.target.closest(".map-popup")) closePopup(); });
   }
 
-  /* Simple pan/zoom on the SVG group — pointer events unify mouse + touch */
-  function attachMapPanZoom(wrap) {
+  /* Simple pan/zoom on the SVG group — pointer events unify mouse + touch.
+     `key` ("large"/"mini") persists scale/tx/ty in mapViewState across
+     re-renders. Previously every live-simulation re-render rebuilt the SVG
+     from scratch and silently snapped any zoom/pan the person had set back
+     to identity — a real bug where interacting with the map mid-session,
+     then waiting ~20s for the live tick, reset your view without warning.
+     The transform is now restored immediately on attach. */
+  function attachMapPanZoom(wrap, key) {
     const svg = wrap.querySelector("svg");
     const group = wrap.querySelector(".map-zoom-group");
     if (!svg || !group) return;
-    let scale = 1, tx = 0, ty = 0, dragging = false, lastX = 0, lastY = 0;
-    function apply() { group.setAttribute("transform", `translate(${tx} ${ty}) scale(${scale})`); }
+    const persisted = (key && mapViewState[key]) || { scale: 1, tx: 0, ty: 0 };
+    let scale = persisted.scale, tx = persisted.tx, ty = persisted.ty, dragging = false, lastX = 0, lastY = 0;
+    function apply() {
+      group.setAttribute("transform", `translate(${tx} ${ty}) scale(${scale})`);
+      if (key && mapViewState[key]) { mapViewState[key].scale = scale; mapViewState[key].tx = tx; mapViewState[key].ty = ty; }
+    }
+    apply();
     svg.addEventListener("wheel", (e) => {
       e.preventDefault();
       scale = clamp1(scale + (e.deltaY < 0 ? 0.15 : -0.15), 1, 3.2);
@@ -600,7 +742,7 @@
     const mount = document.getElementById("mapMountLarge");
     mount.innerHTML = `<div class="map-wrap">${buildMapSVG(filtered, { large: true })}</div>${legendHTML()}`;
     attachMapInteractions(mount.querySelector(".map-wrap"), filtered);
-    attachMapPanZoom(mount.querySelector(".map-wrap"));
+    attachMapPanZoom(mount.querySelector(".map-wrap"), "large");
 
     document.getElementById("mapResultCount").textContent = filtered.length;
     const grid = document.getElementById("sppgGrid");

@@ -4,59 +4,65 @@
    ========================================================================= */
 
 :root {
-  /* Base chrome — deep navy lifted straight from the MBG mark (#0B111A),
-     with a touch more blue-violet depth so gold has room to pop. */
-  --bg-0: #070B13;
-  --bg-1: #0B111C;
-  --bg-2: #121A28;
-  --bg-card: #101826;
-  --border-soft: rgba(217,175,82,0.09);
-  --border-strong: rgba(217,175,82,0.22);
+  /* ===== National Command Center design system — v3 =====
+     Dark mode: deep navy technology surface with cyan + gold accents.
+     Palette derived from the "PROTOTYPE WEBSITE MBG" emblem (navy /
+     light-blue / gold / white / health-green / tech-cyan), expressed as
+     CSS variables so every component below inherits the same system. */
+  --navy-900: #020817;
+  --navy-800: #071432;
+  --navy-700: #0E2455;
 
-  /* Text — raised contrast across the board (old --text-lo at 7C8AA0 on
-     #0E1520 was ~3.2:1, failing body-text contrast; new values clear
-     WCAG AA at every tier). */
-  --text-hi: #F5F8FC;
-  --text-mid: #C3CEE0;
-  --text-lo: #93A1BA;
+  --bg-0: #050D24;   /* page background */
+  --bg-1: #071432;   /* sidebar / topbar / footer surface */
+  --bg-2: #0E2048;   /* inputs, hovers, secondary surfaces */
+  --bg-card: #0B193B; /* card / panel surface */
+  --border-soft: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.16);
 
-  --accent-cyan: #4CD2FF;
-  --accent-cyan-dim: rgba(76,210,255,0.16);
-  --accent-green: #3EE0A0;
-  --accent-green-dim: rgba(62,224,160,0.16);
-  --accent-orange: #FFB05C;
-  --accent-orange-dim: rgba(255,176,92,0.16);
-  --accent-red: #FF6B76;
-  --accent-red-dim: rgba(255,107,118,0.18);
-  --accent-gray: #8493B8;
-  --accent-gray-dim: rgba(132,147,184,0.16);
+  --text-hi: #F4F8FF;
+  --text-mid: #B7C5DD;
+  --text-lo: #7F91AE;
+
+  --blue-600: #3185E6;
+  --blue-500: #45A4F5;
+  --accent-cyan: #32C7E6;
+  --accent-cyan-dim: rgba(50,199,230,0.16);
+  --accent-green: #63C765;
+  --accent-green-dim: rgba(99,199,101,0.16);
+  --accent-orange: #F1B83B;
+  --accent-orange-dim: rgba(241,184,59,0.16);
+  --accent-red: #FF5C5C;
+  --accent-red-dim: rgba(255,92,92,0.18);
+  --accent-gray: #7F91AE;
+  --accent-gray-dim: rgba(127,145,174,0.16);
 
   /* Institutional accent — navy + gold, taken directly from the MBG Watch
-     logo (#0B111A / #D9AF52), echoing the ministry-style palette without
-     reproducing any official emblem/seal artwork. Used for brand chrome
-     (logo, active nav, primary buttons, highlights); status colors above
+     logo, echoing the ministry-style palette without reproducing any
+     official emblem/seal artwork. Used sparingly for brand chrome (logo,
+     active nav, primary buttons, highlighted numbers); status colors above
      stay semantic (green/cyan/orange/red/gray) and are never replaced by
      gold. */
-  --accent-gold: #E4B75C;
-  --accent-gold-2: #C99A3E;
-  --accent-gold-dim: rgba(228,183,92,0.16);
-  --accent-gold-soft: rgba(228,183,92,0.38);
+  --accent-gold: #D9B33F;
+  --accent-gold-2: #B88912;
+  --accent-gold-dim: rgba(217,179,63,0.16);
+  --accent-gold-soft: rgba(217,179,63,0.38);
 
   /* Sea/land tones for the Indonesia map — deep sea blue behind a warm
      gold-lit landmass, so the archipelago actually reads as land instead
      of near-invisible dots on a blank field. */
-  --map-sea-top: #0D1830;
-  --map-sea-bottom: #060B15;
-  --map-land: rgba(228,183,92,0.10);
-  --map-land-top: rgba(228,183,92,0.55);
+  --map-sea-top: #0D1F44;
+  --map-sea-bottom: #050D24;
+  --map-land: rgba(217,179,63,0.10);
+  --map-land-top: rgba(217,179,63,0.55);
   --map-land-bottom: rgba(180,138,58,0.85);
-  --map-land-glow: rgba(228,183,92,0.65);
+  --map-land-glow: rgba(217,179,63,0.65);
   --map-land-stroke: rgba(255,224,158,0.9);
-  --map-grid: rgba(228,183,92,0.10);
+  --map-grid: rgba(50,199,230,0.10);
 
-  --radius-md: 14px;
-  --radius-lg: 18px;
-  --shadow-card: 0 8px 24px rgba(0,0,0,0.4);
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --shadow-card: 0 8px 24px rgba(2,8,23,0.45);
 
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
@@ -67,31 +73,49 @@
 }
 
 [data-theme="light"] {
-  --bg-0: #F3F0E8;
-  --bg-1: #FAF8F2;
-  --bg-2: #FFFFFF;
+  /* Light mode is its own considered system, not an inverted dark mode:
+     sky-blue background, navy text/chrome, gold reserved for highlights. */
+  --navy-900: #071A52;
+  --navy-800: #0B2468;
+  --navy-700: #123A8C;
+
+  --bg-0: #EAF6FC;
+  --bg-1: #F5FBFF;
+  --bg-2: #EFF8FD;
   --bg-card: #FFFFFF;
-  --border-soft: rgba(15,23,42,0.08);
-  --border-strong: rgba(15,23,42,0.16);
-  /* Darker, warmer text tiers for real body-copy contrast on white cards. */
-  --text-hi: #10151F;
-  --text-mid: #3A4356;
-  --text-lo: #5C6785;
-  --shadow-card: 0 8px 20px rgba(15,23,42,0.08);
+  --border-soft: rgba(7,26,82,0.10);
+  --border-strong: rgba(7,26,82,0.20);
+  --text-hi: #071A52;
+  --text-mid: #53657D;
+  --text-lo: #7D8DA3;
+  --shadow-card: 0 8px 20px rgba(7,26,82,0.08);
+
+  --blue-600: #1769C2;
+  --blue-500: #2388D9;
+  --accent-cyan: #28B8D8;
+  --accent-cyan-dim: rgba(40,184,216,0.14);
+  --accent-green: #3D8B3D;
+  --accent-green-dim: rgba(61,139,61,0.12);
+  --accent-orange: #E8A317;
+  --accent-orange-dim: rgba(232,163,23,0.14);
+  --accent-red: #D64545;
+  --accent-red-dim: rgba(214,69,69,0.14);
+  --accent-gray: #7D8DA3;
+  --accent-gray-dim: rgba(125,141,163,0.14);
 
   --map-sea-top: #E7EEF7;
   --map-sea-bottom: #D8E3F0;
-  --map-land: rgba(169,121,30,0.06);
-  --map-land-top: rgba(201,154,62,0.95);
+  --map-land: rgba(169,120,5,0.06);
+  --map-land-top: rgba(212,167,44,0.95);
   --map-land-bottom: rgba(150,108,28,0.95);
-  --map-land-glow: rgba(169,121,30,0.45);
+  --map-land-glow: rgba(169,120,5,0.4);
   --map-land-stroke: rgba(120,84,16,0.9);
-  --map-grid: rgba(15,23,42,0.06);
+  --map-grid: rgba(23,105,194,0.08);
 
-  --accent-gold: #A9791E;
-  --accent-gold-2: #8A6118;
-  --accent-gold-dim: rgba(169,121,30,0.12);
-  --accent-gold-soft: rgba(169,121,30,0.32);
+  --accent-gold: #A97805;
+  --accent-gold-2: #8A6104;
+  --accent-gold-dim: rgba(169,120,5,0.12);
+  --accent-gold-soft: rgba(169,120,5,0.32);
 }
 
 * { box-sizing: border-box; }
@@ -107,7 +131,11 @@ html {
 }
 body {
   margin: 0;
-  background: var(--bg-0);
+  background:
+    radial-gradient(ellipse 90% 60% at 15% -10%, var(--accent-cyan-dim), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 100% 0%, var(--accent-gold-dim), transparent 55%),
+    var(--bg-0);
+  background-attachment: fixed;
   color: var(--text-hi);
   font-family: var(--font-body);
   font-size: 15px;
@@ -143,11 +171,26 @@ a { color: inherit; }
 }
 
 /* ---------- Shell ---------- */
-.app-shell { display: flex; min-height: 100vh; max-width: 100vw; overflow-x: hidden; }
+.app-shell { display: flex; min-height: 100vh; max-width: 100vw; overflow-x: hidden; position: relative; }
+/* Ultra-subtle technology grid, fixed to the viewport so it never adds
+   scroll weight or interferes with layout/measurement. */
+.app-shell::before {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-image:
+    linear-gradient(var(--border-soft) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+  background-size: 42px 42px;
+  opacity: .35;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 0%, transparent 70%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 0%, transparent 70%);
+}
+.sidebar, .main-col { position: relative; z-index: 1; }
 
 /* ---------- Sidebar ---------- */
 .sidebar {
   width: var(--sidebar-w); flex-shrink: 0; background: var(--bg-1);
+  background: color-mix(in srgb, var(--bg-1) 92%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   border-right: 1px solid var(--border-soft); display: flex; flex-direction: column;
   padding: 20px 14px; position: sticky; top: 0; height: 100vh; overflow-y: auto;
 }
@@ -165,8 +208,14 @@ a { color: inherit; }
   font-size: 13.5px; cursor: pointer; transition: background .15s, color .15s;
 }
 .nav-item .ic { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.nav-item { position: relative; }
 .nav-item:hover { background: var(--bg-2); color: var(--text-hi); }
 .nav-item.is-active { background: var(--accent-gold-dim); color: var(--accent-gold); }
+.nav-item.is-active::before {
+  content: ""; position: absolute; left: -14px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 60%; border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--accent-gold), var(--accent-cyan));
+}
 
 .sidebar-footer { border-top: 1px solid var(--border-soft); padding-top: 14px; margin-top: 10px; }
 .operator { display: flex; align-items: center; gap: 10px; padding: 6px 8px; }
@@ -187,6 +236,11 @@ a { color: inherit; }
 .dot-critical { background: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
 .dot-offline { background: var(--accent-gray); }
 
+/* Slow, calm breathing pulse on the operational status dot — reads as
+   "alive" without the aggressive blink used for critical alerts. */
+.status-pill .dot-normal { animation: statusBreathe 2.6s ease-in-out infinite; }
+@keyframes statusBreathe { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
 .status-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; background: var(--accent-green-dim); color: var(--accent-green); padding: 5px 10px; border-radius: 20px; }
 .status-pill.status-normal { background: var(--accent-green-dim); color: var(--accent-green); }
 .status-pill.status-monitoring { background: var(--accent-cyan-dim); color: var(--accent-cyan); }
@@ -200,6 +254,8 @@ a { color: inherit; }
 .topbar {
   height: var(--topbar-h); flex-shrink: 0; display: flex; align-items: center; gap: 16px;
   padding: 0 20px; border-bottom: 1px solid var(--border-soft); background: var(--bg-1);
+  background: color-mix(in srgb, var(--bg-1) 90%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   position: sticky; top: 0; z-index: 20;
 }
 .topbar-title { display: flex; flex-direction: column; line-height: 1.1; white-space: nowrap; min-width: 0; overflow: hidden; flex-shrink: 1; }
@@ -261,15 +317,25 @@ a { color: inherit; }
 
 /* ---------- Stats grid ---------- */
 .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
-.stat-card { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 16px; box-shadow: var(--shadow-card); }
-.stat-card .stat-label { font-size: 11px; color: var(--text-lo); letter-spacing: .03em; margin-bottom: 8px; display: block; }
-.stat-card .stat-value { font-family: var(--font-mono); font-size: 26px; font-weight: 700; }
-.stat-card.accent-green .stat-value { color: var(--accent-green); }
-.stat-card.accent-cyan .stat-value { color: var(--accent-cyan); }
-.stat-card.accent-orange .stat-value { color: var(--accent-orange); }
-.stat-card.accent-red .stat-value { color: var(--accent-red); }
-.stat-card.accent-gray .stat-value { color: var(--accent-gray); }
-.stat-card.accent-gold .stat-value { color: var(--accent-gold); }
+.stat-card {
+  background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-md);
+  padding: 16px; box-shadow: var(--shadow-card);
+  transition: border-color .2s ease, transform .2s ease;
+}
+.stat-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+.stat-card .stat-label { font-size: 11px; color: var(--text-lo); letter-spacing: .03em; display: block; }
+.stat-card .stat-value { font-family: var(--font-mono); font-size: 26px; font-weight: 700; display: block; margin: 2px 0 10px; }
+.stat-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.stat-icon { width: 26px; height: 26px; flex-shrink: 0; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: currentColor; }
+.stat-icon svg { width: 15px; height: 15px; color: var(--bg-card); }
+.stat-bar { height: 4px; border-radius: 4px; background: var(--bg-2); overflow: hidden; }
+.stat-bar span { display: block; height: 100%; border-radius: 4px; background: currentColor; transition: width .6s ease; }
+.stat-card.accent-green .stat-value, .stat-card.accent-green .stat-icon, .stat-card.accent-green .stat-bar span { color: var(--accent-green); }
+.stat-card.accent-cyan .stat-value, .stat-card.accent-cyan .stat-icon, .stat-card.accent-cyan .stat-bar span { color: var(--accent-cyan); }
+.stat-card.accent-orange .stat-value, .stat-card.accent-orange .stat-icon, .stat-card.accent-orange .stat-bar span { color: var(--accent-orange); }
+.stat-card.accent-red .stat-value, .stat-card.accent-red .stat-icon, .stat-card.accent-red .stat-bar span { color: var(--accent-red); }
+.stat-card.accent-gray .stat-value, .stat-card.accent-gray .stat-icon, .stat-card.accent-gray .stat-bar span { color: var(--accent-gray); }
+.stat-card.accent-gold .stat-value, .stat-card.accent-gold .stat-icon, .stat-card.accent-gold .stat-bar span { color: var(--accent-gold); }
 .stat-card.accent-gold { border-top: 2px solid var(--accent-gold-soft); }
 
 /* ---------- Critical alert strip ---------- */
@@ -319,6 +385,22 @@ a { color: inherit; }
 .map-marker circle.pulse-ring { animation: mapPulse 2.2s infinite; }
 .map-marker:hover circle:not(.pulse-ring):not(.marker-shadow) { filter: brightness(1.15); }
 @keyframes mapPulse { 0% { r: 4; opacity: .6; } 100% { r: 12; opacity: 0; } }
+
+/* One-shot "ping" on markers the live simulation just touched — distinct
+   from the persistent pulse-ring used for warning/critical, so a normal
+   SPPG that just got a routine data update also visibly reacts once. */
+.marker-ping { animation: markerPing 1.5s ease-out forwards; }
+@keyframes markerPing { 0% { r: 4; opacity: .9; stroke-width: 2; } 100% { r: 15; opacity: 0; stroke-width: 0.3; } }
+
+/* Convoy/distribution routes — subtle dashed lines with a small dot
+   travelling along them via native SVG <animateMotion> (no JS timer). */
+.map-route-line { stroke: var(--accent-cyan); stroke-width: 1; stroke-dasharray: 2 4; opacity: .3; }
+.map-route-line.is-alert { stroke: var(--accent-orange); opacity: .45; stroke-dasharray: 3 3; }
+.map-convoy-dot { filter: drop-shadow(0 0 2.5px currentColor); }
+/* Radar sweep — was using mix-blend-mode:screen, which on the lighter sea
+   gradient in light mode produced a bright, glitchy-looking wedge cutting
+   across the map instead of a subtle scan effect. Removed in favor of a
+   plain low-opacity fill that reads correctly in both themes. */
 .map-legend { display: flex; flex-wrap: wrap; gap: 12px; padding: 0 16px 14px; font-size: 11.5px; color: var(--text-mid); }
 .map-legend span { display: flex; align-items: center; gap: 5px; }
 
@@ -347,10 +429,20 @@ a { color: inherit; }
 .chip { background: var(--bg-card); border: 1px solid var(--border-soft); color: var(--text-mid); padding: 7px 13px; border-radius: 20px; font-size: 12.5px; cursor: pointer; }
 .chip.is-active { background: var(--accent-gold-dim); border-color: var(--accent-gold-soft); color: var(--accent-gold); }
 select#provinceFilter { background: var(--bg-card); border: 1px solid var(--border-soft); color: var(--text-mid); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; }
-.btn-ghost { background: var(--bg-card); border: 1px solid var(--border-soft); color: var(--text-mid); border-radius: 10px; padding: 8px 14px; font-size: 12.5px; cursor: pointer; }
+.btn-ghost {
+  background: var(--bg-card); border: 1px solid var(--border-soft); color: var(--text-mid);
+  border-radius: 11px; padding: 10px 16px; min-height: 40px; font-size: 12.5px; cursor: pointer;
+  transition: border-color .18s ease, color .18s ease, transform .12s ease;
+}
 .btn-ghost:hover { border-color: var(--border-strong); color: var(--text-hi); }
-.btn-primary { background: var(--accent-gold); border: 1px solid var(--accent-gold); color: #1a1304; font-weight: 700; border-radius: 10px; padding: 9px 16px; font-size: 12.5px; cursor: pointer; }
-.btn-primary:hover { filter: brightness(1.08); }
+.btn-ghost:active { transform: translateY(1px); }
+.btn-primary {
+  background: var(--accent-gold); border: 1px solid var(--accent-gold); color: #1a1304; font-weight: 700;
+  border-radius: 11px; padding: 10px 18px; min-height: 40px; font-size: 12.5px; cursor: pointer;
+  transition: filter .18s ease, transform .12s ease;
+}
+.btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); filter: brightness(1); }
 
 .panel-map-large { position: relative; background: radial-gradient(ellipse at 50% 30%, var(--accent-gold-dim), var(--bg-card) 70%); }
 .panel-map { background: radial-gradient(ellipse at 50% 30%, var(--accent-gold-dim), var(--bg-card) 70%); }
@@ -359,10 +451,12 @@ select#provinceFilter { background: var(--bg-card); border: 1px solid var(--bord
   position: absolute; top: 14px; right: 14px; z-index: 15; display: flex; flex-direction: column; gap: 4px;
 }
 .map-zoom-controls button {
-  width: 30px; height: 30px; border-radius: 8px; background: var(--bg-2); border: 1px solid var(--border-soft);
-  color: var(--text-hi); font-size: 15px; cursor: pointer; line-height: 1;
+  width: 34px; height: 34px; border-radius: 9px; background: var(--bg-card); border: 1px solid var(--border-soft);
+  color: var(--text-hi); font-size: 15px; cursor: pointer; line-height: 1; box-shadow: 0 2px 8px rgba(2,8,23,0.12);
+  transition: border-color .15s ease, transform .12s ease, color .15s ease;
 }
-.map-zoom-controls button:hover { border-color: var(--border-strong); }
+.map-zoom-controls button:hover { border-color: var(--accent-gold-soft); color: var(--accent-gold); }
+.map-zoom-controls button:active { transform: scale(0.92); }
 
 .sppg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap: 10px; padding: 14px; }
 .sppg-card { background: var(--bg-2); border: 1px solid var(--border-soft); border-radius: 12px; padding: 12px; cursor: pointer; }
@@ -523,7 +617,8 @@ select#provinceFilter { background: var(--bg-card); border: 1px solid var(--bord
 .risk-overall-label { font-size: 11.5px; color: var(--text-lo); letter-spacing: .05em; margin-bottom: 4px; }
 .risk-overall-tag { font-size: 20px; font-weight: 800; margin-bottom: 8px; }
 .risk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 14px; }
-.risk-card { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-card); cursor: pointer; }
+.risk-card { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: var(--radius-lg); padding: 16px; box-shadow: var(--shadow-card); cursor: pointer; transition: border-color .2s ease, transform .2s ease; }
+.risk-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
 .risk-card-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
 .risk-card-head .r-name { font-weight: 600; font-size: 13.5px; }
 .risk-card-head .r-loc { font-size: 11.5px; color: var(--text-lo); }
@@ -729,10 +824,24 @@ select#provinceFilter { background: var(--bg-card); border: 1px solid var(--bord
    LOGIN GATE
    ========================================================================= */
 .login-gate {
-  position: fixed; inset: 0; z-index: 500; background: var(--bg-0);
-  background-image: radial-gradient(circle at 50% 0%, rgba(217,175,82,0.06), transparent 55%);
+  /* Login is always presented as a dark "command center" surface regardless
+     of the site's light/dark toggle (per brief section 18), so its pattern
+     colors are hardcoded light-on-dark rather than pulled from --border-soft
+     etc. — those flip to dark-on-light in light mode and were rendering
+     invisible against the always-dark navy-900 background here. */
+  position: fixed; inset: 0; z-index: 500; background: var(--navy-900);
+  background-image:
+    linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px),
+    radial-gradient(circle at 50% 0%, rgba(217,179,63,0.16), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(50,199,230,0.14), transparent 50%);
+  background-size: 40px 40px, 40px 40px, auto, auto;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 24px; overflow-y: auto;
+  padding: 24px; overflow-y: auto; position: relative;
+}
+.login-gate::before {
+  content: ""; position: absolute; top: 0; left: 10%; right: 10%; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(217,179,63,0.65), transparent);
 }
 .login-shell {
   width: 100%; max-width: 480px; background: var(--bg-card); border: 1px solid var(--border-soft);
