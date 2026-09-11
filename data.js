@@ -246,7 +246,7 @@ function makeSPPG(index) {
   return sppg;
 }
 
-const SPPG_TOTAL_DEMO = 75;
+const SPPG_TOTAL_DEMO = 300;
 const SPPG_DATA = Array.from({ length: SPPG_TOTAL_DEMO }, (_, i) => makeSPPG(i + 1));
 
 /* Featured SPPG reused for CCTV grid / storyline continuity */
@@ -329,7 +329,7 @@ function buildDapurProfile(sppg) {
 
 /* =========================================================================
    NATIONAL SIMULATION — angka agregat nasional SIMULASI, terpisah dari
-   75 SPPG demo yang benar-benar dimuat di browser. Selalu ditampilkan
+   300 SPPG demo yang benar-benar dimuat di browser. Selalu ditampilkan
    dengan badge "SIMULASI NASIONAL" di UI, tidak pernah disamakan dengan
    data demo yang bisa diklik satu per satu.
    ========================================================================= */
@@ -393,11 +393,60 @@ function buildAlerts() {
 }
 const ALERTS = buildAlerts();
 
+/* -------------------------------------------------------------------------
+   RUNTIME ALERT SIMULATION — separate from buildAlerts() above (which is
+   the deterministic "ground truth" derived from each SPPG's condition at
+   load time). These two functions let app.js's live ticker make the Alert
+   module / notif bell feel genuinely worked, for testing notification UI:
+     - spawnSyntheticAlert(): a new incident "comes in" for a random SPPG
+     - progressRandomAlert(): staff move an OPEN alert through its workflow
+   Both only ever touch the runtime ALERTS array — SPPG_DATA / risk scores
+   are untouched, so this never drifts out of sync with what each SPPG page
+   actually shows.
+   ------------------------------------------------------------------------- */
+const SYNTHETIC_ALERT_TEMPLATES = [
+  { level: "warning", category: "CCTV", message: () => `CCTV mengalami gangguan sinyal sesaat, sedang dicek ulang oleh sistem.` },
+  { level: "monitoring", category: "PRODUCTION", message: () => `Kecepatan produksi melambat ${randInt(5, 15)}% dari rata-rata jam ini.` },
+  { level: "warning", category: "DISTRIBUTION", message: () => `Kendaraan distribusi terlambat berangkat ${randInt(10, 35)} menit dari jadwal.` },
+  { level: "monitoring", category: "SENSOR", message: () => `Fluktuasi suhu ringan terdeteksi pada unit pendingin.` },
+  { level: "warning", category: "SENSOR", message: () => `Kelembapan ruang penyimpanan di luar rentang ideal.` },
+  { level: "monitoring", category: "AUDIT", message: () => `Checklist kebersihan harian belum ditandai selesai oleh petugas.` },
+  { level: "critical", category: "DISTRIBUTION", message: () => `${randInt(2, 5)} titik pengiriman melaporkan keterlambatan lebih dari 1 jam.` },
+];
+let syntheticAlertSeq = 1;
+function spawnSyntheticAlert() {
+  const sppg = pick(SPPG_DATA);
+  const tpl = pick(SYNTHETIC_ALERT_TEMPLATES);
+  const alert = {
+    id: `ALT-RT-${String(syntheticAlertSeq++).padStart(4, "0")}`,
+    sppgId: sppg.id,
+    sppgName: sppg.name,
+    level: tpl.level,
+    category: tpl.category,
+    message: tpl.message(),
+    time: "Baru saja",
+    createdAt: Date.now(),
+    status: "OPEN",
+    riskImpact: -randInt(2, 9),
+  };
+  ALERTS.unshift(alert);
+  return alert;
+}
+const ALERT_STATUS_FLOW = ["OPEN", "ASSIGNED", "VERIFYING", "RESOLVED"];
+function progressRandomAlert() {
+  const open = ALERTS.filter((a) => a.status !== "RESOLVED");
+  if (!open.length) return null;
+  const a = pick(open);
+  const idx = ALERT_STATUS_FLOW.indexOf(a.status);
+  a.status = ALERT_STATUS_FLOW[Math.min(idx + 1, ALERT_STATUS_FLOW.length - 1)];
+  return a;
+}
+
 /* =========================================================================
    AUDITS — total dibuat konsisten dengan angka ringkasan modul Audit.
    ========================================================================= */
 function buildAudits() {
-  const total = 124, completed = 109, followUp = 12, critical = 3;
+  const total = 496, completed = 436, followUp = 48, critical = 12;
   const categories = ["Kebersihan", "Operasional", "Keamanan Pangan", "Kepatuhan SOP"];
   const officers = ["Petugas A", "Petugas B", "Petugas C", "Petugas D"];
   const audits = [];
@@ -427,7 +476,7 @@ const AUDITS = AUDIT_DATA.audits;
 const AUDIT_SUMMARY = AUDIT_DATA.summary;
 
 /* =========================================================================
-   DAILY REPORT — dihitung LANGSUNG dari 75 SPPG demo, bukan angka statis,
+   DAILY REPORT — dihitung LANGSUNG dari 300 SPPG demo, bukan angka statis,
    supaya "Modul Laporan" benar-benar merefleksikan dataset.
    ========================================================================= */
 function buildDailyReport() {
@@ -475,6 +524,14 @@ const ACTIVITIES = [
   { time: "06:47", sppg: SPPG_DATA[33].name, text: "Sensor Suhu Normal Kembali" },
   { time: "06:30", sppg: SPPG_DATA[42].name, text: "Production Target Tercapai" },
   { time: "06:15", sppg: SPPG_DATA[5].name, text: "Petugas Check-in" },
+  { time: "06:02", sppg: SPPG_DATA[58].name, text: "Kendaraan Distribusi Berangkat" },
+  { time: "05:54", sppg: SPPG_DATA[77].name, text: "QC Sampel Lolos" },
+  { time: "05:41", sppg: SPPG_DATA[93].name, text: "Stok Bahan Baku Diterima" },
+  { time: "05:33", sppg: SPPG_DATA[112].name, text: "Production Started" },
+  { time: "05:20", sppg: SPPG_DATA[136].name, text: "Petugas Check-in" },
+  { time: "05:09", sppg: SPPG_DATA[151].name, text: "CCTV Reconnected" },
+  { time: "04:58", sppg: SPPG_DATA[174].name, text: "Audit Completed" },
+  { time: "04:47", sppg: SPPG_DATA[199].name, text: "Distribution Started" },
 ];
 
 /* -------------------------------------------------------------------------
@@ -489,7 +546,9 @@ const LIVE_EVENT_POOL = [
   "Distribution Completed", "CCTV Reconnected", "Audit Completed",
   "Sensor Suhu Normal Kembali", "Production Target Tercapai",
   "Petugas Check-in", "Kendaraan Distribusi Berangkat", "QC Sampel Lolos",
-  "Stok Bahan Baku Diterima",
+  "Stok Bahan Baku Diterima", "Kendaraan Distribusi Tiba", "Serah Terima Selesai",
+  "Checklist Kebersihan Selesai", "Petugas Check-out", "Sampel Menu Diarsipkan",
+  "Laporan Harian Dikirim", "Freezer Kembali Normal", "Koneksi Internet Pulih",
 ];
 function nowClock() {
   const d = new Date();

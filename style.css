@@ -705,6 +705,13 @@ select#provinceFilter { background: var(--bg-card); border: 1px solid var(--bord
 }
 .splash-core { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
 .splash-core svg { animation: splashGlow 2.4s ease-in-out infinite; }
+.splash-core img.splash-logo-img {
+  width: 72px; height: 72px; border-radius: 50%; object-fit: contain;
+  animation: splashGlow 2.4s ease-in-out infinite;
+  filter: drop-shadow(0 0 14px rgba(228,183,92,.4));
+}
+.brand-mark { display: inline-flex; }
+.brand-mark img { display: block; width: 34px; height: 34px; border-radius: 50%; object-fit: contain; }
 @keyframes splashSpin { to { transform: rotate(360deg); } }
 @keyframes splashPulse { 0% { transform: scale(.85); opacity: .7; } 100% { transform: scale(1.25); opacity: 0; } }
 @keyframes splashGlow {
@@ -788,3 +795,36 @@ select#provinceFilter { background: var(--bg-card); border: 1px solid var(--bord
 .map-tooltip, .map-popup, .notif-panel, .mobile-menu-sheet .sheet-inner {
   max-width: calc(100vw - 24px);
 }
+
+/* =========================================================================
+   LIVE ALERT TOASTS — small non-blocking pop-ins for the runtime alert
+   simulation (see runLiveSimulationTick / spawnSyntheticAlert in app.js).
+   Stack sits above the bottom nav on mobile, top-right on desktop.
+   ========================================================================= */
+.live-toast-stack {
+  position: fixed; z-index: 900; display: flex; flex-direction: column; gap: 8px;
+  left: 12px; right: 12px; bottom: calc(var(--bottomnav-h, 62px) + 14px);
+  pointer-events: none;
+}
+@media (min-width: 900px) {
+  .live-toast-stack { left: auto; right: 20px; bottom: 20px; width: 340px; }
+}
+.live-toast {
+  pointer-events: auto; cursor: pointer;
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-card);
+  padding: 11px 13px; animation: liveToastIn .3s ease-out;
+}
+.live-toast.is-leaving { animation: liveToastOut .35s ease-in forwards; }
+.live-toast .lt-dot {
+  width: 9px; height: 9px; border-radius: 50%; margin-top: 4px; flex: none;
+  background: var(--accent-orange); box-shadow: 0 0 0 3px var(--accent-orange-dim);
+}
+.live-toast.is-critical .lt-dot { background: var(--accent-red); box-shadow: 0 0 0 3px var(--accent-red-dim); }
+.live-toast.is-warning .lt-dot { background: var(--accent-orange); box-shadow: 0 0 0 3px var(--accent-orange-dim); }
+.live-toast .lt-body { min-width: 0; }
+.live-toast .lt-title { font-size: 12.5px; font-weight: 700; color: var(--text-hi); margin-bottom: 2px; }
+.live-toast .lt-msg { font-size: 12px; color: var(--text-mid); overflow-wrap: anywhere; }
+@keyframes liveToastIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes liveToastOut { to { opacity: 0; transform: translateY(-6px); } }

@@ -150,12 +150,48 @@
       s.status = derived.status; s.riskScore = derived.riskScore; s.riskBreakdown = derived.breakdown;
     }
     setLastUpdatedNow();
+
+    // Alert workflow simulation: incidents keep arriving, staff keep working
+    // the queue — makes the Alert tab / notif bell feel genuinely alive
+    // instead of a frozen snapshot. Runs every tick (~20s); each event is
+    // independently probabilistic so it doesn't fire in lockstep.
+    let alertsChanged = false;
+    if (Math.random() < 0.55) { progressRandomAlert(); alertsChanged = true; }
+    if (Math.random() < 0.4) {
+      const a = spawnSyntheticAlert();
+      alertsChanged = true;
+      if (a.level !== "monitoring") showLiveToast(a);
+    }
+    if (alertsChanged && typeof refreshAlertUI === "function") refreshAlertUI();
+
     // Re-render currently visible view's live-ish widgets cheaply
     if (state.view === "overview") { renderStatsAndSummary(); renderCriticalStrip(); renderAttention(); }
     if (state.view === "map") renderLargeMap();
     if (state.view === "risk") renderRiskCenter();
   }
   function clamp1(n, lo, hi) { return Math.max(lo, Math.min(hi, n)); }
+
+  /* Small non-blocking toast for incoming alerts — purely cosmetic, never
+     blocks interaction, caps itself so the stack can't grow unbounded. */
+  function showLiveToast(alert) {
+    let stack = document.getElementById("liveToastStack");
+    if (!stack) {
+      stack = el(`<div class="live-toast-stack" id="liveToastStack" aria-live="polite"></div>`);
+      document.body.appendChild(stack);
+    }
+    const levelLabel = { critical: "CRITICAL", warning: "WARNING", monitoring: "INFO" }[alert.level] || "INFO";
+    const toast = el(`<div class="live-toast is-${alert.level}">
+      <span class="lt-dot"></span>
+      <div class="lt-body">
+        <div class="lt-title">${levelLabel} · ${escapeHtml(alert.sppgName)}</div>
+        <div class="lt-msg">${escapeHtml(alert.message)}</div>
+      </div>
+    </div>`);
+    toast.addEventListener("click", () => { setView("alerts"); toast.remove(); });
+    stack.appendChild(toast);
+    while (stack.children.length > 3) stack.removeChild(stack.firstChild);
+    setTimeout(() => { toast.classList.add("is-leaving"); setTimeout(() => toast.remove(), 400); }, 5200);
+  }
 
   function setLastUpdatedNow() {
     const nodes = document.querySelectorAll("[data-last-updated]");
@@ -371,9 +407,9 @@
     function tick() {
       pushLiveActivity();
       if (document.getElementById("activityTimeline")) renderActivity(true);
-      liveTickerHandle = setTimeout(tick, 9000 + Math.random() * 7000);
+      liveTickerHandle = setTimeout(tick, 4000 + Math.random() * 5000);
     }
-    liveTickerHandle = setTimeout(tick, 9000 + Math.random() * 7000);
+    liveTickerHandle = setTimeout(tick, 4000 + Math.random() * 5000);
   }
 
   /* =======================================================================
@@ -708,8 +744,15 @@
      CCTV
      ======================================================================= */
   function cctvCamerasForGrid() {
+    const areas = ["Area Produksi", "Area Packing", "Area Gudang", "Loading Area"];
     const featured = [FEATURED.bogor, FEATURED.depok, FEATURED.bandung, FEATURED.jakarta];
-    return featured.map((s, i) => ({ id: `CAM 0${i + 1}`, sppg: s, area: ["Area Produksi", "Area Packing", "Area Gudang", "Loading Area"][i] }));
+    // Spread the rest across the dataset (every ~25th SPPG) so the grid
+    // reflects the full 300-SPPG demo instead of always the same 4 kitchens
+    // — mixes in a few offline/critical ones too, for a realistic feed.
+    const extra = [];
+    for (let i = 7; i < SPPG_DATA.length && extra.length < 8; i += 25) extra.push(SPPG_DATA[i]);
+    const all = featured.concat(extra);
+    return all.map((s, i) => ({ id: `CAM ${String(i + 1).padStart(2, "0")}`, sppg: s, area: areas[i % areas.length] }));
   }
   function cctvFeedMarkup(cam, big) {
     const isLive = cam.sppg.cctv.status === "online";
@@ -1520,3 +1563,13 @@
     });
   });
 })();
+
+// PWA: register the service worker so the app qualifies as installable and
+// keeps working if the connection drops. Kept outside the main IIFE / off
+// the critical path — registration failing (e.g. file:// preview) must
+// never block the dashboard itself.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => { /* preview/offline contexts: ignore */ });
+  });
+}

@@ -9,7 +9,7 @@ MBG WATCH mensimulasikan tampilan sebuah **National Monitoring Command Center**:
 
 ## 2. Fitur Utama
 
-- **Operational Summary** dengan badge "SIMULASI NASIONAL" (27.381 SPPG simulasi) terpisah dari **Data Demo** (75 SPPG yang benar-benar dimuat di browser).
+- **Operational Summary** dengan badge "SIMULASI NASIONAL" (27.381 SPPG simulasi) terpisah dari **Data Demo** (300 SPPG yang benar-benar dimuat di browser).
 - **Critical Alert Strip** — elemen paling menonjol saat ada alert critical.
 - **Peta SPPG** — SVG ringan, mendukung zoom (scroll/tombol), pan (drag), search, filter status & provinsi, hover tooltip, klik → popup → detail.
 - **SPPG Memerlukan Perhatian** — diurutkan dari Risk Score terendah.
@@ -18,7 +18,7 @@ MBG WATCH mensimulasikan tampilan sebuah **National Monitoring Command Center**:
 - **Early Warning System** dengan workflow nyata: `OPEN → ASSIGNED → VERIFYING → RESOLVED`, disimpan di `localStorage`.
 - **CCTV Simulator** — tampilan ala monitoring station (noise, scanline, timestamp, REC/LIVE indicator) tanpa video sungguhan, digerakkan oleh **satu** ticker global (bukan `setInterval` baru setiap render).
 - **Audit & Inspeksi** dengan modal detail + tombol "Mark as Follow Up".
-- **Laporan** — Daily Operation Report dihitung langsung dari dataset 75 SPPG demo + tombol **Export CSV** (memakai `Blob`, tanpa backend).
+- **Laporan** — Daily Operation Report dihitung langsung dari dataset 300 SPPG demo + tombol **Export CSV** (memakai `Blob`, tanpa backend).
 - **Analitik** — status breakdown, CCTV uptime, completion produksi/distribusi, alert by category.
 - **Mobile-first**: bottom navigation, peta ringkas (40–55vh), filter horizontal-scroll, layout khusus (bukan sekadar mengecilkan desktop).
 - **Dark & Light mode**, keduanya didesain penuh (bukan sekadar ganti warna latar).
