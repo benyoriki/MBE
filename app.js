@@ -1181,6 +1181,15 @@
   /* =======================================================================
      ANALYTICS
      ======================================================================= */
+  // Stable-for-the-session pseudo-random seed for the weekly trend chart —
+  // set once at load so revisiting the Analytics tab doesn't make the
+  // "history" jump around, while still varying between sessions/reloads.
+  const analyticsWeekSeed = Math.random() * 1000;
+  function seededNoise(i) {
+    const x = Math.sin(i * 12.9898 + analyticsWeekSeed * 78.233) * 43758.5453;
+    return x - Math.floor(x); // 0..1
+  }
+
   function renderAnalytics() {
     const counts = { normal: 0, monitoring: 0, warning: 0, critical: 0, offline: 0 };
     SPPG_DATA.forEach((s) => counts[s.status]++);
@@ -1215,6 +1224,77 @@
         <span style="width:60px;text-align:right">${count}</span>
       </div>`;
     }).join("");
+
+    // ---- Risk distribution donut (SVG, native stroke-dasharray segments —
+    // no chart library) matching the LOW/MEDIUM/HIGH/CRITICAL bands from
+    // the brief's Risk Center spec (0-30 / 31-60 / 61-80 / 81-100). ----
+    const bands = [
+      { label: "Low (0–30)", color: "var(--accent-green)", count: 0 },
+      { label: "Medium (31–60)", color: "var(--accent-cyan)", count: 0 },
+      { label: "High (61–80)", color: "var(--accent-orange)", count: 0 },
+      { label: "Critical (81–100)", color: "var(--accent-red)", count: 0 },
+    ];
+    SPPG_DATA.forEach((s) => {
+      const r = s.riskScore;
+      bands[r <= 30 ? 0 : r <= 60 ? 1 : r <= 80 ? 2 : 3].count++;
+    });
+    const R = 46, C = 2 * Math.PI * R;
+    let offset = 0;
+    const segments = bands.map((b) => {
+      const frac = b.count / total;
+      const len = frac * C;
+      const seg = `<circle cx="60" cy="60" r="${R}" fill="none" stroke="${b.color}" stroke-width="14"
+        stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-offset}" stroke-linecap="butt" class="donut-seg"/>`;
+      offset += len;
+      return seg;
+    }).join("");
+    document.getElementById("riskDistribution").innerHTML = `
+      <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <svg viewBox="0 0 120 120" width="140" height="140" style="flex-shrink:0" role="img" aria-label="Distribusi Risk Score SPPG">
+          <circle cx="60" cy="60" r="${R}" fill="none" stroke="var(--bg-2)" stroke-width="14"/>
+          ${segments}
+          <text x="60" y="56" text-anchor="middle" font-family="var(--font-mono)" font-size="20" font-weight="700" fill="var(--text-hi)">${total}</text>
+          <text x="60" y="72" text-anchor="middle" font-size="9" fill="var(--text-lo)">SPPG</text>
+        </svg>
+        <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:150px">
+          ${bands.map((b) => `<div style="display:flex;align-items:center;gap:8px;font-size:12px">
+            <span style="width:9px;height:9px;border-radius:3px;background:${b.color};flex-shrink:0"></span>
+            <span style="color:var(--text-mid);flex:1">${b.label}</span>
+            <span style="font-family:var(--font-mono);font-weight:600">${b.count}</span>
+          </div>`).join("")}
+        </div>
+      </div>`;
+
+    // ---- Weekly production trend — lightweight SVG area/line chart, no
+    // canvas/library. Last point is today's real average completion; the
+    // preceding six are seeded pseudo-random so the "week" looks organic
+    // but stays stable while the person is exploring this session. ----
+    const days = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+    const todayIdx = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
+    const series = days.map((_, i) => {
+      if (i === todayIdx) return prodAvg;
+      const drift = (seededNoise(i) - 0.5) * 18;
+      return Math.max(55, Math.min(99, Math.round(prodAvg + drift)));
+    });
+    const W = 320, H = 110, pad = 8;
+    const stepX = (W - pad * 2) / (series.length - 1);
+    const toY = (v) => H - pad - ((v - 50) / 50) * (H - pad * 2);
+    const pts = series.map((v, i) => [pad + i * stepX, toY(v)]);
+    const linePath = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+    const areaPath = `${linePath} L ${pts[pts.length - 1][0]},${H - pad} L ${pts[0][0]},${H - pad} Z`;
+    document.getElementById("productionTrend").innerHTML = `
+      <svg viewBox="0 0 ${W} ${H + 22}" width="100%" height="${H + 22}" preserveAspectRatio="none" role="img" aria-label="Tren produksi mingguan">
+        <defs>
+          <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent-gold)" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="var(--accent-gold)" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path d="${areaPath}" fill="url(#trendFill)"/>
+        <path d="${linePath}" fill="none" stroke="var(--accent-gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        ${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${i === todayIdx ? 3.6 : 2.4}" fill="${i === todayIdx ? "var(--accent-gold)" : "var(--bg-card)"}" stroke="var(--accent-gold)" stroke-width="1.6"/>`).join("")}
+        ${days.map((d, i) => `<text x="${pad + i * stepX}" y="${H + 16}" text-anchor="middle" font-size="9.5" fill="var(--text-lo)">${d}</text>`).join("")}
+      </svg>`;
   }
 
   /* =======================================================================

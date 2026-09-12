@@ -3,6 +3,40 @@
    Dark "National Command Center" design system, refined light mode.
    ========================================================================= */
 
+/* Self-hosted fonts (assets/fonts/, SIL OFL licensed — see LICENSE files in
+   that folder) instead of Google Fonts. One less external network round
+   trip, cached by the service worker for offline use, and never blocked by
+   a flaky connection to a third-party CDN. Only the weights actually used
+   in this UI are included, so total weight stays small (~170KB, woff2). */
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("assets/fonts/inter-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("assets/fonts/inter-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("assets/fonts/inter-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("assets/fonts/inter-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter"; font-style: normal; font-weight: 800; font-display: swap;
+  src: url("assets/fonts/inter-latin-800-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono"; font-style: normal; font-weight: 500; font-display: swap;
+  src: url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("assets/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2");
+}
+
 :root {
   /* ===== National Command Center design system — v3 =====
      Dark mode: deep navy technology surface with cyan + gold accents.
@@ -87,13 +121,17 @@
   --border-strong: rgba(7,26,82,0.20);
   --text-hi: #071A52;
   --text-mid: #53657D;
-  --text-lo: #7D8DA3;
+  --text-lo: #5D6D83;
   --shadow-card: 0 8px 20px rgba(7,26,82,0.08);
 
   --blue-600: #1769C2;
   --blue-500: #2388D9;
-  --accent-cyan: #28B8D8;
-  --accent-cyan-dim: rgba(40,184,216,0.14);
+  /* accent-cyan darkened from the raw brand cyan (#28B8D8, 2.35:1 on white —
+     fails WCAG AA for text) to a deeper teal-cyan that clears 4.5:1 while
+     still reading as "cyan" against navy/gold. The bright cyan is kept for
+     dark mode (where it sits on a dark surface and already passes). */
+  --accent-cyan: #1B8197;
+  --accent-cyan-dim: rgba(27,129,151,0.14);
   --accent-green: #3D8B3D;
   --accent-green-dim: rgba(61,139,61,0.12);
   --accent-orange: #E8A317;
@@ -314,6 +352,26 @@ a { color: inherit; }
   font-size: 11px; padding: 5px 10px; border-radius: 8px; font-family: var(--font-mono);
   border: 1px solid var(--accent-gold-soft);
 }
+
+/* Skeleton loading placeholders — shown in the static HTML before app.js
+   finishes downloading/running (matters on slow connections, which is a
+   realistic condition for a nationwide monitoring tool), then simply
+   overwritten by the real content once render*() runs (all render
+   functions already do `container.innerHTML = ""` first, so no extra JS
+   is needed to "dismiss" these — they just get replaced). */
+.skeleton { position: relative; overflow: hidden; background: var(--bg-2); border-radius: 8px; }
+.skeleton::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+  animation: skeletonShimmer 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .skeleton::after { animation: none; } }
+@keyframes skeletonShimmer { 100% { transform: translateX(100%); } }
+.skel-stat-card { height: 92px; border-radius: var(--radius-md); padding: 16px; border: 1px solid var(--border-soft); background: var(--bg-card); }
+.skel-line { height: 10px; border-radius: 4px; margin-bottom: 8px; }
+.skel-map { height: 260px; border-radius: var(--radius-md); }
+.skel-row { height: 46px; border-radius: 10px; margin-bottom: 8px; }
+.donut-seg { transition: stroke-dasharray .6s ease; }
 
 /* ---------- Stats grid ---------- */
 .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }

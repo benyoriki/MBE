@@ -5,8 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>MBG WATCH — Integrated Monitoring &amp; Early Warning System (Prototype)</title>
 <meta name="description" content="Prototype dashboard konsep National Monitoring Command Center untuk Program Makan Bergizi Gratis. Seluruh data pada situs ini adalah data simulasi." />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<!-- Fonts are self-hosted in assets/fonts/ (see style.css @font-face) instead of
+     loaded from Google Fonts. Removes an external network dependency that used
+     to be a single point of slowness/failure on weak connections — the exact
+     use case this dashboard is meant to work well under. -->
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" href="assets/icons/favicon-32.png" type="image/png" sizes="32x32">
 <link rel="icon" href="assets/icons/favicon-16.png" type="image/png" sizes="16x16">
@@ -277,7 +279,13 @@
           <span class="sim-badge">SIMULASI NASIONAL</span>
           <span class="muted" id="demoCountBadge">DATA DEMO: — SPPG dimuat di browser ini</span>
         </div>
-        <div class="stats-grid" id="statsGrid"></div>
+        <div class="stats-grid" id="statsGrid">
+          <div class="skel-stat-card"><div class="skel-line skeleton" style="width:60%"></div><div class="skel-line skeleton" style="width:40%;height:22px"></div></div>
+          <div class="skel-stat-card"><div class="skel-line skeleton" style="width:60%"></div><div class="skel-line skeleton" style="width:40%;height:22px"></div></div>
+          <div class="skel-stat-card"><div class="skel-line skeleton" style="width:60%"></div><div class="skel-line skeleton" style="width:40%;height:22px"></div></div>
+          <div class="skel-stat-card"><div class="skel-line skeleton" style="width:60%"></div><div class="skel-line skeleton" style="width:40%;height:22px"></div></div>
+          <div class="skel-stat-card"><div class="skel-line skeleton" style="width:60%"></div><div class="skel-line skeleton" style="width:40%;height:22px"></div></div>
+        </div>
 
         <!-- 3. Critical Alerts strip -->
         <div class="critical-strip" id="criticalStrip" hidden></div>
@@ -289,7 +297,7 @@
               <h2>Peta Sebaran SPPG</h2>
               <button class="link-btn" data-goto="map">Buka peta penuh →</button>
             </div>
-            <div id="mapMount"></div>
+            <div id="mapMount"><div class="skel-map skeleton"></div></div>
           </section>
 
           <!-- 6. Live Operations -->
@@ -298,14 +306,14 @@
               <h2>Live Operations</h2>
               <span class="pill-live"><span class="pulse"></span>LIVE</span>
             </div>
-            <ul class="ops-list" id="opsList"></ul>
+            <ul class="ops-list" id="opsList"><li class="skel-row skeleton"></li><li class="skel-row skeleton"></li><li class="skel-row skeleton"></li></ul>
           </section>
         </div>
 
         <!-- 5. SPPG Requiring Attention -->
         <section class="panel">
           <div class="panel-head"><h2>SPPG Memerlukan Perhatian</h2><span class="muted">Diurutkan berdasarkan Risk Score terendah</span></div>
-          <div class="attention-list" id="attentionList"></div>
+          <div class="attention-list" id="attentionList"><div class="skel-row skeleton"></div><div class="skel-row skeleton"></div></div>
         </section>
 
         <div class="section-row">
@@ -314,13 +322,13 @@
               <h2>Early Warning</h2>
               <button class="link-btn" data-goto="alerts">Lihat semua alert →</button>
             </div>
-            <div class="alert-list" id="alertPreview"></div>
+            <div class="alert-list" id="alertPreview"><div class="skel-row skeleton"></div><div class="skel-row skeleton"></div></div>
           </section>
 
           <!-- 9. Activity -->
           <section class="panel">
             <div class="panel-head"><h2>Aktivitas Terbaru</h2></div>
-            <ul class="timeline" id="activityTimeline"></ul>
+            <ul class="timeline" id="activityTimeline"><li class="skel-row skeleton"></li><li class="skel-row skeleton"></li><li class="skel-row skeleton"></li></ul>
           </section>
         </div>
       </section>
@@ -356,7 +364,7 @@
             <button data-zoom-out aria-label="Perkecil">−</button>
             <button data-zoom-reset aria-label="Reset zoom">⤾</button>
           </div>
-          <div id="mapMountLarge"></div>
+          <div id="mapMountLarge"><div class="skel-map skeleton" style="height:420px"></div></div>
         </section>
 
         <section class="panel">
@@ -444,14 +452,26 @@
       <section class="view" id="view-analytics" hidden>
         <div class="view-header"><div><h1>Analitik</h1><p class="muted">Distribusi status &amp; performa SPPG demo (dummy)</p></div></div>
         <section class="panel" id="analyticsKpis"></section>
-        <section class="panel">
-          <div class="panel-head"><h2>Distribusi Status</h2></div>
-          <div id="statusBreakdown"></div>
-        </section>
-        <section class="panel">
-          <div class="panel-head"><h2>Alert by Category</h2></div>
-          <div id="alertsByCategory" style="padding:18px"></div>
-        </section>
+        <div class="section-row">
+          <section class="panel">
+            <div class="panel-head"><h2>Distribusi Status</h2></div>
+            <div id="statusBreakdown"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Distribusi Risk Score</h2></div>
+            <div id="riskDistribution" style="padding:18px"></div>
+          </section>
+        </div>
+        <div class="section-row">
+          <section class="panel">
+            <div class="panel-head"><h2>Tren Produksi Mingguan</h2><span class="muted">Rata-rata completion, 7 hari terakhir (simulasi)</span></div>
+            <div id="productionTrend" style="padding:18px"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Alert by Category</h2></div>
+            <div id="alertsByCategory" style="padding:18px"></div>
+          </section>
+        </div>
       </section>
 
       <!-- ---------- SYSTEM ---------- -->
