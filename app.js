@@ -553,6 +553,10 @@
   // one-shot "ping" ring so the map visibly reacts to new data instead of
   // only ever showing a frozen snapshot.
   let lastChangedSppgIds = new Set();
+  // First paint on each mount gets a west→east cascade-in animation on the
+  // markers; live re-renders after that skip it so the map doesn't
+  // "flicker" its entrance every ~20s tick.
+  let mapMiniHasPainted = false, mapLargeHasPainted = false;
   // Pan/zoom is preserved across re-renders (the live tick used to rebuild
   // the whole SVG every 20s and silently reset any zoom/pan the user had
   // set — fixed by keeping this state outside the render function).
@@ -569,16 +573,25 @@
   function buildMapSVG(dataset, opts) {
     opts = opts || {};
     const uid = `m${++mapInstanceSeq}`;
-    const markers = dataset.map((s) => {
+    const markers = dataset.map((s, i) => {
       const { x, y } = project(s.lat, s.lng);
       const color = statusColorVar(s.status);
       const ring = (s.status === "critical" || s.status === "warning")
         ? `<circle class="pulse-ring" cx="${x}" cy="${y}" r="4" fill="none" stroke="${color}" stroke-width="1.4"/>` : "";
       const justUpdated = lastChangedSppgIds.has(s.id)
         ? `<circle class="marker-ping" cx="${x}" cy="${y}" r="4" fill="none" stroke="${color}" stroke-width="2"/>` : "";
-      return `<g class="map-marker" data-id="${s.id}" tabindex="0" role="button" aria-label="${escapeHtml(s.name)}">
+      // Entrance cascade: only on a mount's first paint, delay keyed to
+      // x-position so the archipelago "lights up" west→east instead of in
+      // dataset order. Twinkle: a permanent, very slow, per-marker-staggered
+      // brightness breathing so a calm/normal map still reads as alive
+      // between the 20s data ticks — delay is derived from the SPPG id so
+      // it's stable across re-renders (no jumping/resyncing).
+      const enter = opts.animateIn ? ` map-marker-enter" style="animation-delay:${Math.round((x / MAP_W) * 500)}ms` : "";
+      const idHash = [...s.id].reduce((a, c) => a + c.charCodeAt(0), 0);
+      const twinkleDelay = (idHash % 40) / 10; // 0..3.9s
+      return `<g class="map-marker${enter}" data-id="${s.id}" tabindex="0" role="button" aria-label="${escapeHtml(s.name)}">
         ${ring}${justUpdated}<circle class="marker-shadow" cx="${x}" cy="${y + 1}" r="${opts.large ? 5 : 4}" fill="rgba(0,0,0,.35)"/>
-        <circle cx="${x}" cy="${y}" r="${opts.large ? 5 : 4}" fill="${color}" stroke="rgba(0,0,0,.45)" stroke-width="0.6"/>
+        <circle class="marker-twinkle" style="animation-delay:${twinkleDelay}s" cx="${x}" cy="${y}" r="${opts.large ? 5 : 4}" fill="${color}" stroke="rgba(0,0,0,.45)" stroke-width="0.6"/>
         <circle cx="${x - (opts.large ? 1.6 : 1.3)}" cy="${y - (opts.large ? 1.6 : 1.3)}" r="${opts.large ? 1.4 : 1.1}" fill="rgba(255,255,255,.55)"/>
       </g>`;
     }).join("");
@@ -588,7 +601,7 @@
     for (let gx = 100; gx < MAP_W; gx += 100) graticule.push(`<line x1="${gx}" y1="0" x2="${gx}" y2="${MAP_H}" />`);
     for (let gy = 80; gy < MAP_H; gy += 80) graticule.push(`<line x1="0" y1="${gy}" x2="${MAP_W}" y2="${gy}" />`);
     const shapes = `
-      <path d="${INDONESIA_LAND_PATH}" fill="none" stroke="var(--map-land-glow)" stroke-width="5" opacity="0.55" filter="url(#${uid}-landBlur)"/>
+      <path d="${INDONESIA_LAND_PATH}" class="map-land-breathe" fill="none" stroke="var(--map-land-glow)" stroke-width="5" opacity="0.55" filter="url(#${uid}-landBlur)"/>
       <path d="${INDONESIA_LAND_PATH}" fill="url(#${uid}-landGradient)" stroke="var(--map-land-stroke)" stroke-width="1.1" stroke-linejoin="round" filter="url(#${uid}-landShadow)"/>`;
     const radar = buildRadarSweep(uid);
     const routes = buildRouteAnimations(dataset, uid);
@@ -723,8 +736,9 @@
 
   function renderMiniMap() {
     const mount = document.getElementById("mapMount");
-    mount.innerHTML = `<div class="map-wrap">${buildMapSVG(SPPG_DATA)}</div>${legendHTML()}`;
+    mount.innerHTML = `<div class="map-wrap">${buildMapSVG(SPPG_DATA, { animateIn: !mapMiniHasPainted })}</div>${legendHTML()}`;
     attachMapInteractions(mount.querySelector(".map-wrap"), SPPG_DATA);
+    mapMiniHasPainted = true;
   }
 
   function getFilteredSPPG() {
@@ -740,13 +754,18 @@
   function renderLargeMap() {
     const filtered = getFilteredSPPG();
     const mount = document.getElementById("mapMountLarge");
-    mount.innerHTML = `<div class="map-wrap">${buildMapSVG(filtered, { large: true })}</div>${legendHTML()}`;
+    mount.innerHTML = `<div class="map-wrap">${buildMapSVG(filtered, { large: true, animateIn: !mapLargeHasPainted })}</div>${legendHTML()}`;
     attachMapInteractions(mount.querySelector(".map-wrap"), filtered);
     attachMapPanZoom(mount.querySelector(".map-wrap"), "large");
+    mapLargeHasPainted = true;
 
     document.getElementById("mapResultCount").textContent = filtered.length;
     const grid = document.getElementById("sppgGrid");
     grid.innerHTML = "";
+    if (!filtered.length) {
+      grid.innerHTML = `<p class="muted" style="padding:16px;grid-column:1/-1">Tidak ada SPPG yang cocok dengan filter ini. Coba ubah status atau provinsi.</p>`;
+      return;
+    }
     const frag = document.createDocumentFragment();
     filtered.forEach((s) => {
       const card = el(`
@@ -785,11 +804,46 @@
   function persistFilters() { storageSet(STORAGE_KEYS.filters, { status: state.mapStatusFilter, province: state.mapProvinceFilter }); }
 
   document.getElementById("globalSearch").addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { document.getElementById("searchDropdown").hidden = true; return; }
     if (e.key !== "Enter" || state.appMode !== "admin") return;
+    document.getElementById("searchDropdown").hidden = true;
     state.mapSearch = e.target.value;
     setView("map");
     document.getElementById("mapSearch").value = e.target.value;
     renderLargeMap();
+  });
+  // Live search-as-you-type dropdown (command-palette style) — jumping
+  // straight to a specific SPPG's detail is faster than "search, then find
+  // it in a filtered list", which is what Enter alone gave you before.
+  document.getElementById("globalSearch").addEventListener("input", debounce((e) => {
+    const dropdown = document.getElementById("searchDropdown");
+    const q = e.target.value.trim().toLowerCase();
+    if (state.appMode !== "admin" || q.length < 2) { dropdown.hidden = true; return; }
+    const matches = SPPG_DATA.filter((s) =>
+      s.name.toLowerCase().includes(q) || s.city.toLowerCase().includes(q) ||
+      s.id.toLowerCase().includes(q) || s.province.toLowerCase().includes(q)
+    ).slice(0, 6);
+    if (!matches.length) {
+      dropdown.innerHTML = `<div class="search-empty">Tidak ada SPPG cocok dengan "${escapeHtml(e.target.value)}"</div>`;
+      dropdown.hidden = false;
+      return;
+    }
+    dropdown.innerHTML = matches.map((s) => `
+      <button type="button" class="search-result" data-id="${s.id}">
+        <span class="dot dot-${s.status}"></span>
+        <span class="search-result-text"><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.city)}, ${escapeHtml(s.province)}</small></span>
+        <span class="search-result-risk">Risk ${s.riskScore}</span>
+      </button>`).join("");
+    dropdown.hidden = false;
+  }, 120));
+  document.getElementById("searchDropdown").addEventListener("click", (e) => {
+    const btn = e.target.closest(".search-result"); if (!btn) return;
+    document.getElementById("searchDropdown").hidden = true;
+    document.getElementById("globalSearch").value = "";
+    openDetailModal(btn.dataset.id);
+  });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".topbar-search")) document.getElementById("searchDropdown").hidden = true;
   });
 
   /* =======================================================================
@@ -956,12 +1010,12 @@
      ======================================================================= */
   function renderProductionChart() {
     const max = Math.max(...PRODUCTION_WEEK.map((d) => d.target)) * 1.05;
-    const bars = PRODUCTION_WEEK.map((d) => `
+    const bars = PRODUCTION_WEEK.map((d, i) => `
       <div class="bar-cols">
         <div class="bar-group">
-          <div class="bar" style="height:${(d.target / max) * 180}px;background:var(--accent-gray)"></div>
-          <div class="bar" style="height:${(d.produksi / max) * 180}px;background:var(--accent-cyan)"></div>
-          <div class="bar" style="height:${(d.distribusi / max) * 180}px;background:var(--accent-green)"></div>
+          <div class="bar bar-grow" style="--h:${(d.target / max) * 180}px;background:var(--accent-gray);animation-delay:${i * 60}ms" data-value="${fmt(d.target)}" title="Target: ${fmt(d.target)} porsi"></div>
+          <div class="bar bar-grow" style="--h:${(d.produksi / max) * 180}px;animation-delay:${i * 60 + 30}ms;background:var(--accent-cyan)" data-value="${fmt(d.produksi)}" title="Produksi: ${fmt(d.produksi)} porsi"></div>
+          <div class="bar bar-grow" style="--h:${(d.distribusi / max) * 180}px;animation-delay:${i * 60 + 60}ms;background:var(--accent-green)" data-value="${fmt(d.distribusi)}" title="Distribusi: ${fmt(d.distribusi)} porsi"></div>
         </div>
         <div class="bar-group-label">${d.day}</div>
       </div>`).join("");

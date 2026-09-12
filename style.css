@@ -303,10 +303,32 @@ a { color: inherit; }
 .topbar-search {
   flex: 1 1 120px; min-width: 0; max-width: 420px; display: flex; align-items: center; gap: 8px;
   background: var(--bg-2); border: 1px solid var(--border-soft); border-radius: 10px; padding: 8px 12px;
+  position: relative;
 }
 .topbar-search svg { width: 15px; height: 15px; stroke: var(--text-lo); fill: none; stroke-width: 2; flex-shrink: 0; }
 .topbar-search input { border: none; background: transparent; color: var(--text-hi); font-size: 13px; width: 100%; min-width: 0; outline: none; }
 .topbar-search input::placeholder { color: var(--text-lo); }
+
+/* Search-as-you-type dropdown (command-palette style) */
+.search-dropdown {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60;
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 12px;
+  box-shadow: 0 14px 34px rgba(2,8,23,0.28); overflow: hidden; max-height: 320px; overflow-y: auto;
+  animation: dropdownIn .15s ease both;
+}
+@keyframes dropdownIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+.search-result {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: none; border: none;
+  border-bottom: 1px solid var(--border-soft); cursor: pointer; text-align: left; color: var(--text-hi);
+  transition: background .12s ease;
+}
+.search-result:last-child { border-bottom: none; }
+.search-result:hover, .search-result:focus-visible { background: var(--bg-2); }
+.search-result-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.search-result-text strong { font-size: 13px; }
+.search-result-text small { font-size: 11px; color: var(--text-lo); }
+.search-result-risk { font-family: var(--font-mono); font-size: 11px; color: var(--text-mid); flex-shrink: 0; }
+.search-empty { padding: 14px; font-size: 12.5px; color: var(--text-lo); }
 
 .topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-shrink: 0; }
 .icon-btn {
@@ -444,6 +466,30 @@ a { color: inherit; }
 .map-marker:hover circle:not(.pulse-ring):not(.marker-shadow) { filter: brightness(1.15); }
 @keyframes mapPulse { 0% { r: 4; opacity: .6; } 100% { r: 12; opacity: 0; } }
 
+/* Entrance cascade — markers scale/fade in west→east on a mount's first
+   paint only (see mapMiniHasPainted/mapLargeHasPainted in app.js). One-shot,
+   so it costs nothing after the initial render. */
+.map-marker-enter { animation: markerEnter .5s cubic-bezier(.2,.8,.3,1.2) both; transform-origin: center; transform-box: fill-box; }
+@keyframes markerEnter { 0% { opacity: 0; transform: scale(0); } 100% { opacity: 1; transform: scale(1); } }
+
+/* Twinkle — a slow, permanent, per-marker-staggered brightness breathing so
+   the map still reads as "alive" between live-simulation ticks even when
+   nothing has actually changed yet. Opacity-only (cheap, compositor-only),
+   never affects layout. */
+.marker-twinkle { animation: markerTwinkle 5s ease-in-out infinite; }
+@keyframes markerTwinkle { 0%, 100% { opacity: 1; } 50% { opacity: .72; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .map-marker-enter { animation: none; }
+  .marker-twinkle { animation: none; }
+}
+/* Land outline glow breathes very slowly — reinforces the "live sensor
+   glow" read on the archipelago without ever moving/repainting geometry
+   (opacity-only on an already-blurred path, effectively free). */
+.map-land-breathe { animation: landBreathe 6s ease-in-out infinite; }
+@keyframes landBreathe { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.7; } }
+@media (prefers-reduced-motion: reduce) { .map-land-breathe { animation: none; } }
+
 /* One-shot "ping" on markers the live simulation just touched — distinct
    from the persistent pulse-ring used for warning/critical, so a normal
    SPPG that just got a routine data update also visibly reacts once. */
@@ -452,8 +498,10 @@ a { color: inherit; }
 
 /* Convoy/distribution routes — subtle dashed lines with a small dot
    travelling along them via native SVG <animateMotion> (no JS timer). */
-.map-route-line { stroke: var(--accent-cyan); stroke-width: 1; stroke-dasharray: 2 4; opacity: .3; }
-.map-route-line.is-alert { stroke: var(--accent-orange); opacity: .45; stroke-dasharray: 3 3; }
+.map-route-line { stroke: var(--accent-cyan); stroke-width: 1; stroke-dasharray: 2 4; opacity: .3; animation: routeFlow 1.2s linear infinite; }
+.map-route-line.is-alert { stroke: var(--accent-orange); opacity: .45; stroke-dasharray: 3 3; animation-duration: .8s; }
+@keyframes routeFlow { to { stroke-dashoffset: -12; } }
+@media (prefers-reduced-motion: reduce) { .map-route-line { animation: none; } }
 .map-convoy-dot { filter: drop-shadow(0 0 2.5px currentColor); }
 /* Radar sweep — was using mix-blend-mode:screen, which on the lighter sea
    gradient in light mode produced a bright, glitchy-looking wedge cutting
@@ -650,7 +698,20 @@ select#provinceFilter { background: var(--bg-card); border: 1px solid var(--bord
 .legend-swatch { width: 10px; height: 10px; border-radius: 3px; }
 .bar-chart { display: flex; align-items: flex-end; gap: 14px; height: 220px; }
 .bar-group { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 100%; width: 100%; }
-.bar { flex: 1; max-width: 26px; border-radius: 5px 5px 0 0; position: relative; }
+.bar { flex: 1; max-width: 26px; height: var(--h, 0px); border-radius: 5px 5px 0 0; position: relative; transition: filter .15s ease; }
+.bar:hover { filter: brightness(1.15); }
+.bar-grow { animation: barGrow .5s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes barGrow { 0% { transform: scaleY(0); } 100% { transform: scaleY(1); } }
+.bar-group { transform-origin: bottom; }
+.bar { transform-origin: bottom; }
+.bar::after {
+  content: attr(data-value); position: absolute; top: -20px; left: 50%; transform: translateX(-50%);
+  font-size: 10px; font-family: var(--font-mono); color: var(--text-hi); background: var(--bg-card);
+  border: 1px solid var(--border-soft); padding: 1px 5px; border-radius: 5px; white-space: nowrap;
+  opacity: 0; pointer-events: none; transition: opacity .15s ease; box-shadow: 0 2px 6px rgba(0,0,0,.2);
+}
+.bar:hover::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .bar-grow { animation: none; } }
 .bar-group-label { text-align: center; font-size: 11.5px; color: var(--text-lo); margin-top: 8px; }
 .bar-cols { display: flex; flex-direction: column; align-items: stretch; width: 100%; }
 

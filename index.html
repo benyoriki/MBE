@@ -41,6 +41,34 @@
   </div>
   <div class="splash-footer">PROTOTYPE • DATA SIMULASI</div>
 </div>
+<script>
+  // Defensive net, deliberately independent of app.js: if the main script
+  // fails to get past the splash screen within 12s for ANY reason (a stale
+  // service-worker cache serving a mismatched app.js, a future bug, a slow
+  // connection), show a plain "reload" fallback instead of freezing forever
+  // on the loading animation with no way out.
+  window.setTimeout(function () {
+    var splash = document.getElementById("splashScreen");
+    if (!splash || splash.classList.contains("is-done")) return;
+    var status = document.getElementById("splashStatus");
+    if (status) status.textContent = "Memuat lebih lama dari biasanya...";
+    var retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Muat ulang halaman";
+    retry.style.cssText = "margin-top:16px;padding:10px 18px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:#fff;font:inherit;cursor:pointer";
+    retry.onclick = function () {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) { r.unregister(); });
+        }).finally(function () { location.reload(); });
+      } else {
+        location.reload();
+      }
+    };
+    var inner = splash.querySelector(".splash-inner");
+    if (inner && !inner.querySelector("button")) inner.appendChild(retry);
+  }, 12000);
+</script>
 
 <!-- ============ LOGIN GATE ============ -->
 <div class="login-gate" id="loginGate" hidden>
@@ -230,7 +258,8 @@
 
       <div class="topbar-search">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="search" id="globalSearch" placeholder="Cari SPPG, wilayah, ID..." aria-label="Cari SPPG" />
+        <input type="search" id="globalSearch" placeholder="Cari SPPG, wilayah, ID..." aria-label="Cari SPPG" autocomplete="off" />
+        <div class="search-dropdown" id="searchDropdown" hidden></div>
       </div>
 
       <div class="topbar-actions">
