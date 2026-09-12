@@ -462,9 +462,18 @@ a { color: inherit; }
 .map-graticule line { stroke: var(--map-grid); stroke-width: 0.6; stroke-dasharray: 2 4; }
 .map-marker { cursor: pointer; }
 .map-marker .marker-shadow { filter: blur(1px); }
-.map-marker circle.pulse-ring { animation: mapPulse 2.2s infinite; }
+.map-marker circle.pulse-ring {
+  animation: mapPulse 2.2s infinite;
+  transform-box: fill-box; transform-origin: center;
+  will-change: transform, opacity;
+}
 .map-marker:hover circle:not(.pulse-ring):not(.marker-shadow) { filter: brightness(1.15); }
-@keyframes mapPulse { 0% { r: 4; opacity: .6; } 100% { r: 12; opacity: 0; } }
+/* Perf: transform+opacity only — no longer animates the SVG "r" attribute,
+   which forced a geometry repaint on every frame for every warning/
+   critical marker (this ran continuously, forever, and was one of the
+   biggest contributors to the map feeling choppy). Visually equivalent
+   expanding-ring look, but compositor-only. */
+@keyframes mapPulse { 0% { transform: scale(1); opacity: .6; } 100% { transform: scale(3); opacity: 0; } }
 
 /* Entrance cascade — markers scale/fade in west→east on a mount's first
    paint only (see mapMiniHasPainted/mapLargeHasPainted in app.js). One-shot,
@@ -493,8 +502,11 @@ a { color: inherit; }
 /* One-shot "ping" on markers the live simulation just touched — distinct
    from the persistent pulse-ring used for warning/critical, so a normal
    SPPG that just got a routine data update also visibly reacts once. */
-.marker-ping { animation: markerPing 1.5s ease-out forwards; }
-@keyframes markerPing { 0% { r: 4; opacity: .9; stroke-width: 2; } 100% { r: 15; opacity: 0; stroke-width: 0.3; } }
+.marker-ping {
+  animation: markerPing 1.5s ease-out forwards;
+  transform-box: fill-box; transform-origin: center;
+}
+@keyframes markerPing { 0% { transform: scale(1); opacity: .9; stroke-width: 2; } 100% { transform: scale(3.75); opacity: 0; stroke-width: 0.3; } }
 
 /* Convoy/distribution routes — subtle dashed lines with a small dot
    travelling along them via native SVG <animateMotion> (no JS timer). */
@@ -502,7 +514,7 @@ a { color: inherit; }
 .map-route-line.is-alert { stroke: var(--accent-orange); opacity: .45; stroke-dasharray: 3 3; animation-duration: .8s; }
 @keyframes routeFlow { to { stroke-dashoffset: -12; } }
 @media (prefers-reduced-motion: reduce) { .map-route-line { animation: none; } }
-.map-convoy-dot { filter: drop-shadow(0 0 2.5px currentColor); }
+.map-convoy-dot { opacity: .92; }
 /* Radar sweep — was using mix-blend-mode:screen, which on the lighter sea
    gradient in light mode produced a bright, glitchy-looking wedge cutting
    across the map instead of a subtle scan effect. Removed in favor of a

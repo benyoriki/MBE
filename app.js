@@ -13,6 +13,7 @@
   const state = {
     view: "overview",
     appMode: "admin", // 'admin' | 'dapur' — set at login, drives which nav/views are active
+    dapurSppgId: null, // set at login for a Dapur session — see toastAllowed in runLiveSimulationTick
     mapStatusFilter: "all",
     mapProvinceFilter: "all",
     mapSearch: "",
@@ -21,6 +22,7 @@
     activeDetailTab: "overview",
     activeAlertId: null,
     activeAuditId: null,
+    simPaused: false, // toggled by the QA/testing panel's "Jeda Simulasi Live" button
   };
 
   /* =======================================================================
@@ -137,7 +139,14 @@
   /* Light real-time simulation: nudge a few live numbers every ~20s so the
      dashboard feels alive without ever doing a full page reload or spawning
      new intervals. */
-  function runLiveSimulationTick() {
+  function runLiveSimulationTick(forceRun) {
+    if (state.simPaused && !forceRun) return;
+    // National "Live Pulse" counters (meals served, vehicles, staff, admin
+    // online) — purely cosmetic, ticks every time the rest of the live
+    // simulation does so the Overview always feels like one coherent
+    // live system rather than several independently-timed widgets.
+    tickLivePulse();
+    renderLivePulse(true);
     // Perturb sensors/production/distribution for a wider slice of SPPG
     // each tick so more of the dashboard — not just the map — visibly
     // moves between updates (was 3 SPPG; a national command center with
@@ -177,7 +186,13 @@
     if (Math.random() < 0.4) {
       const a = spawnSyntheticAlert();
       alertsChanged = true;
-      if (a.level !== "monitoring") showLiveToast(a);
+      // Toast visibility rule: the admin/audit command center is supposed
+      // to see every incoming national alert — that's its whole job. A
+      // Dapur (kitchen) session must only ever be interrupted by something
+      // about ITS OWN kitchen; a toast reading "SPPG Ambon ... offline"
+      // popping up over the Bogor kitchen's dashboard was exactly this bug.
+      const toastAllowed = state.appMode === "admin" || (state.appMode === "dapur" && a.sppgId === state.dapurSppgId);
+      if (a.level !== "monitoring" && toastAllowed) showLiveToast(a);
     }
     if (alertsChanged && typeof refreshAlertUI === "function") refreshAlertUI();
 
@@ -186,8 +201,20 @@
     // startup — the "Live Operations" list and the Overview mini-map sat
     // frozen forever after the first paint even while everything else on
     // the dashboard kept moving. Now they refresh with the same 20s tick.
-    if (state.view === "overview") { renderStatsAndSummary(); renderCriticalStrip(); renderAttention(); renderOps(); renderMiniMap(); }
-    if (state.view === "map") renderLargeMap();
+    if (state.view === "overview") {
+      renderStatsAndSummary(); renderCriticalStrip(); renderAttention(); renderOps();
+      // Perf: the map is by far the most expensive thing to rebuild here
+      // (full SVG teardown/rebuild: ~300 markers + gradients + filters),
+      // so the automatic tick only redraws it every OTHER cycle (~40s
+      // instead of ~20s) — still clearly "live", at half the rebuild
+      // cost. This was a major contributor to the map feeling choppy.
+      mapRebuildCounter++;
+      if (mapRebuildCounter % 2 === 0) renderMiniMap();
+    }
+    if (state.view === "map") {
+      mapRebuildCounter++;
+      if (mapRebuildCounter % 2 === 0) renderLargeMap();
+    }
     if (state.view === "risk") renderRiskCenter();
     if (state.view === "cctv") renderCCTV();
     // Sensor IoT grid lives inside the Distribusi view (id="sensorGrid"),
@@ -213,7 +240,7 @@
         <div class="lt-msg">${escapeHtml(alert.message)}</div>
       </div>
     </div>`);
-    toast.addEventListener("click", () => { setView("alerts"); toast.remove(); });
+    toast.addEventListener("click", () => { setView(state.appMode === "dapur" ? "dapur-overview" : "alerts"); toast.remove(); });
     stack.appendChild(toast);
     while (stack.children.length > 3) stack.removeChild(stack.firstChild);
     setTimeout(() => { toast.classList.add("is-leaving"); setTimeout(() => toast.remove(), 400); }, 5200);
@@ -333,6 +360,29 @@
     "accent-orange": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/></svg>',
     "accent-red": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
   };
+  /* Live Pulse — national counters strip on Overview. Reads straight from
+     the LIVE_PULSE object in data.js; `flash` briefly highlights any value
+     that actually changed since the last paint (skipped on first render). */
+  function renderLivePulse(flash) {
+    const map = {
+      pulseMeals: fmt(LIVE_PULSE.mealsToday),
+      pulseChildren: fmt(LIVE_PULSE.childrenServed),
+      pulseVehicles: fmt(LIVE_PULSE.vehiclesActive),
+      pulseStaff: fmt(LIVE_PULSE.staffOnDuty),
+      pulseAdmin: fmt(LIVE_PULSE.adminOnline),
+    };
+    Object.entries(map).forEach(([id, val]) => {
+      const node = document.getElementById(id);
+      if (!node) return;
+      const changed = node.textContent !== val;
+      node.textContent = val;
+      if (flash && changed) {
+        node.classList.add("pulse-flash");
+        setTimeout(() => node.classList.remove("pulse-flash"), 700);
+      }
+    });
+  }
+
   function renderStatsAndSummary() {
     const counts = { normal: 0, monitoring: 0, warning: 0, critical: 0, offline: 0 };
     SPPG_DATA.forEach((s) => counts[s.status]++);
@@ -495,7 +545,7 @@
     if (prefersReducedMotion() || dataset.length < 2) return "";
     const usable = dataset.filter((s) => s.status !== "offline");
     if (usable.length < 2) return "";
-    const pairCount = Math.min(7, Math.max(2, Math.floor(usable.length / 12)));
+    const pairCount = Math.min(4, Math.max(2, Math.floor(usable.length / 20)));
     const pairs = [];
     // Route any active warning/critical SPPG to its nearest normal/monitoring
     // "hub" — reads as "bantuan/tim sedang menuju lokasi", which is more
@@ -553,6 +603,9 @@
   // one-shot "ping" ring so the map visibly reacts to new data instead of
   // only ever showing a frozen snapshot.
   let lastChangedSppgIds = new Set();
+  // Counts automatic live-simulation ticks so the (expensive) full map
+  // rebuild can be throttled to every other tick — see runLiveSimulationTick.
+  let mapRebuildCounter = 0;
   // First paint on each mount gets a west→east cascade-in animation on the
   // markers; live re-renders after that skip it so the map doesn't
   // "flicker" its entrance every ~20s tick.
@@ -589,9 +642,18 @@
       const enter = opts.animateIn ? ` map-marker-enter" style="animation-delay:${Math.round((x / MAP_W) * 500)}ms` : "";
       const idHash = [...s.id].reduce((a, c) => a + c.charCodeAt(0), 0);
       const twinkleDelay = (idHash % 40) / 10; // 0..3.9s
+      // Perf: only markers that actually need attention (not "normal")
+      // get the twinkle breathing animation. Animating all ~300 markers
+      // at once was the main cause of the map feeling choppy/laggy on
+      // mobile — SVG doesn't composite individual shapes onto separate
+      // layers the way HTML elements do, so many concurrently-animating
+      // circles forces the whole map to repaint on nearly every frame.
+      // Limiting it to the smaller "needs attention" subset keeps the
+      // "alive" read where it's most meaningful, at a fraction of the cost.
+      const twinkleClass = s.status !== "normal" ? " marker-twinkle" : "";
       return `<g class="map-marker${enter}" data-id="${s.id}" tabindex="0" role="button" aria-label="${escapeHtml(s.name)}">
         ${ring}${justUpdated}<circle class="marker-shadow" cx="${x}" cy="${y + 1}" r="${opts.large ? 5 : 4}" fill="rgba(0,0,0,.35)"/>
-        <circle class="marker-twinkle" style="animation-delay:${twinkleDelay}s" cx="${x}" cy="${y}" r="${opts.large ? 5 : 4}" fill="${color}" stroke="rgba(0,0,0,.45)" stroke-width="0.6"/>
+        <circle class="marker-dot${twinkleClass}" style="animation-delay:${twinkleDelay}s" cx="${x}" cy="${y}" r="${opts.large ? 5 : 4}" fill="${color}" stroke="rgba(0,0,0,.45)" stroke-width="0.6"/>
         <circle cx="${x - (opts.large ? 1.6 : 1.3)}" cy="${y - (opts.large ? 1.6 : 1.3)}" r="${opts.large ? 1.4 : 1.1}" fill="rgba(255,255,255,.55)"/>
       </g>`;
     }).join("");
@@ -603,8 +665,8 @@
     const shapes = `
       <path d="${INDONESIA_LAND_PATH}" class="map-land-breathe" fill="none" stroke="var(--map-land-glow)" stroke-width="5" opacity="0.55" filter="url(#${uid}-landBlur)"/>
       <path d="${INDONESIA_LAND_PATH}" fill="url(#${uid}-landGradient)" stroke="var(--map-land-stroke)" stroke-width="1.1" stroke-linejoin="round" filter="url(#${uid}-landShadow)"/>`;
-    const radar = buildRadarSweep(uid);
-    const routes = buildRouteAnimations(dataset, uid);
+    const radar = opts.large ? buildRadarSweep(uid) : "";
+    const routes = opts.large ? buildRouteAnimations(dataset, uid) : "";
     return `<svg viewBox="0 0 ${MAP_W} ${MAP_H}" role="img" aria-label="Peta sebaran SPPG Indonesia (simulasi, dengan simulasi pergerakan distribusi)">
       <defs>
         <linearGradient id="${uid}-seaGradient" x1="0" y1="0" x2="0.3" y2="1">
@@ -1423,7 +1485,11 @@
     const s = sppgById(id); if (!s) return;
     state.activeSPPGId = id; state.activeDetailTab = "overview";
     document.getElementById("detailTitle").textContent = s.name;
-    document.getElementById("detailLocation").innerHTML = `${escapeHtml(s.city)}, ${escapeHtml(s.province)} · <span class="dot dot-${s.status}"></span> ${statusLabel(s.status)} · Risk ${s.riskScore}/100`;
+    const viewers = randomViewerCount();
+    const viewerHTML = viewers > 0
+      ? ` · <span class="viewer-chip"><span class="dot dot-monitoring"></span>${viewers} admin lain sedang melihat</span>`
+      : "";
+    document.getElementById("detailLocation").innerHTML = `${escapeHtml(s.city)}, ${escapeHtml(s.province)} · <span class="dot dot-${s.status}"></span> ${statusLabel(s.status)} · Risk ${s.riskScore}/100${viewerHTML}`;
     document.querySelectorAll("#detailTabs .tab").forEach((t) => t.classList.toggle("is-active", t.dataset.tab === "overview"));
     renderFavoriteBtn(id); renderDetailTab(); detailModal.hidden = false;
     const lastVisited = storageGet(STORAGE_KEYS.lastVisited, []);
@@ -1488,6 +1554,7 @@
     hydrateAudits();
     restoreFilters();
 
+    renderLivePulse(false);
     renderStatsAndSummary();
     renderCriticalStrip();
     renderAttention();
@@ -1514,8 +1581,98 @@
     renderNotifList();
     renderFavoriteList();
     setLastUpdatedNow();
+    initQAPanel();
     setView("overview");
     appTicker.start();
+  }
+
+  /* =======================================================================
+     QA / TESTING PANEL (Settings) — manual triggers so a tester can produce
+     alerts, offline SPPG, resolved workflows etc. on demand instead of
+     waiting for the automatic ~20s live simulation. Everything here only
+     ever touches the same runtime arrays/functions the automatic
+     simulation uses (spawnSyntheticAlert, progressRandomAlert, etc.), so
+     behaviour stays consistent whether a change was triggered by a human
+     or by the timer.
+     ======================================================================= */
+  function qaLog(msg) {
+    const log = document.getElementById("qaLog");
+    if (!log) return;
+    const t = new Date().toLocaleTimeString("id-ID", { hour12: false });
+    log.prepend(el(`<div class="qa-log-entry">[${t}] ${escapeHtml(msg)}</div>`));
+    while (log.children.length > 25) log.removeChild(log.lastChild);
+  }
+  function qaRefreshLiveViews() {
+    if (state.view === "overview") { renderStatsAndSummary(); renderCriticalStrip(); renderAttention(); renderOps(); renderMiniMap(); }
+    if (state.view === "map") renderLargeMap();
+    if (state.view === "risk") renderRiskCenter();
+    if (state.view === "cctv") renderCCTV();
+    if (typeof refreshAlertUI === "function") refreshAlertUI();
+    setLastUpdatedNow();
+  }
+  function initQAPanel() {
+    const btnCritical = document.getElementById("qaTriggerCritical");
+    if (!btnCritical) return; // panel not present for this session/role
+    const btnWarning = document.getElementById("qaTriggerWarning");
+    const btnOffline = document.getElementById("qaForceOffline");
+    const btnResolve = document.getElementById("qaResolveAlert");
+    const btnSpeed = document.getElementById("qaSpeedUp");
+    const btnToggle = document.getElementById("qaToggleSim");
+    const pill = document.getElementById("qaSimStatusPill");
+    if (btnCritical.dataset.wired) return; // avoid double-binding if initDashboard ever re-runs
+    btnCritical.dataset.wired = "1";
+
+    btnCritical.addEventListener("click", () => {
+      const a = spawnSyntheticAlert("critical");
+      showLiveToast(a); qaRefreshLiveViews();
+      qaLog(`Alert CRITICAL dipicu manual untuk ${a.sppgName} (${a.category}).`);
+    });
+    btnWarning.addEventListener("click", () => {
+      const a = spawnSyntheticAlert("warning");
+      showLiveToast(a); qaRefreshLiveViews();
+      qaLog(`Alert WARNING dipicu manual untuk ${a.sppgName} (${a.category}).`);
+    });
+    btnOffline.addEventListener("click", () => {
+      const { sppg, alert } = qaForceSppgOffline();
+      showLiveToast(alert); qaRefreshLiveViews();
+      qaLog(`${sppg.name} dipaksa OFFLINE untuk pengujian — status kini ${statusLabel(sppg.status)}, risk score ${sppg.riskScore}.`);
+    });
+    btnResolve.addEventListener("click", () => {
+      const a = qaResolveRandomAlert();
+      if (!a) { qaLog("Tidak ada alert terbuka untuk diselesaikan."); return; }
+      qaRefreshLiveViews();
+      qaLog(`Alert ${a.id} (${a.sppgName}) ditandai RESOLVED untuk pengujian.`);
+    });
+    btnSpeed.addEventListener("click", () => {
+      btnSpeed.disabled = true;
+      const originalLabel = btnSpeed.innerHTML;
+      qaLog("Mempercepat simulasi ~30 detik (6 tick beruntun)...");
+      let count = 0;
+      const burst = setInterval(() => {
+        runLiveSimulationTick(true); // forceRun: bypasses the pause flag intentionally
+        qaRefreshLiveViews();
+        count++;
+        btnSpeed.innerHTML = `<span class="qa-btn-icon dot dot-monitoring"></span> Mempercepat... (${count}/6)`;
+        if (count >= 6) {
+          clearInterval(burst);
+          btnSpeed.innerHTML = originalLabel;
+          btnSpeed.disabled = false;
+          qaLog("Simulasi dipercepat selesai.");
+        }
+      }, 350);
+    });
+    btnToggle.addEventListener("click", () => {
+      state.simPaused = !state.simPaused;
+      btnToggle.innerHTML = state.simPaused
+        ? '<span class="qa-btn-icon dot dot-critical"></span> Lanjutkan Simulasi Live'
+        : '<span class="qa-btn-icon dot dot-monitoring"></span> Jeda Simulasi Live';
+      btnToggle.classList.toggle("is-armed", state.simPaused);
+      if (pill) {
+        pill.innerHTML = state.simPaused ? "SIMULASI DIJEDA" : '<span class="pulse"></span>SIMULASI AKTIF';
+        pill.style.color = state.simPaused ? "var(--text-lo)" : "";
+      }
+      qaLog(state.simPaused ? "Simulasi live dijeda oleh pengguna." : "Simulasi live dilanjutkan.");
+    });
   }
 
   /* =======================================================================
@@ -1528,17 +1685,26 @@
     document.getElementById("dapurLocation").textContent = `${sppg.city}, ${sppg.province}`;
     document.getElementById("dapurStatusPill").innerHTML = `<span class="dot dot-${sppg.status}"></span>${statusLabel(sppg.status)} · Risk ${sppg.riskScore}/100`;
   }
+  const DAPUR_STAT_ICONS = {
+    staff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    production: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20v-3"/></svg>',
+    distribution: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4"/></svg>',
+    cctv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>',
+  };
   function renderDapurStats(sppg, profile) {
     const hadir = profile.staff.filter((s) => s.status === "Hadir").length;
     const stats = [
-      { label: "STAF HADIR HARI INI", value: `${hadir}/${profile.staff.length}`, cls: "accent-green" },
-      { label: "PRODUKSI", value: `${sppg.production.completion}%`, cls: "accent-gold" },
-      { label: "DISTRIBUSI", value: sppg.distribution.delayed > 0 ? "TERLAMBAT" : "TEPAT WAKTU", cls: sppg.distribution.delayed > 0 ? "accent-orange" : "accent-green" },
-      { label: "CCTV", value: sppg.cctv.status.toUpperCase(), cls: sppg.cctv.status === "online" ? "accent-cyan" : "accent-gray" },
+      { label: "STAF HADIR HARI INI", value: `${hadir}/${profile.staff.length}`, cls: "accent-green", icon: "staff" },
+      { label: "PRODUKSI", value: `${sppg.production.completion}%`, cls: "accent-gold", icon: "production" },
+      { label: "DISTRIBUSI", value: sppg.distribution.delayed > 0 ? "TERLAMBAT" : "TEPAT WAKTU", cls: sppg.distribution.delayed > 0 ? "accent-orange" : "accent-green", icon: "distribution" },
+      { label: "CCTV", value: sppg.cctv.status.toUpperCase(), cls: sppg.cctv.status === "online" ? "accent-cyan" : "accent-gray", icon: "cctv" },
     ];
     const grid = document.getElementById("dapurStatsGrid");
     grid.innerHTML = "";
-    stats.forEach((s) => grid.appendChild(el(`<div class="stat-card ${s.cls}"><span class="stat-label">${s.label}</span><span class="stat-value" style="font-size:20px">${escapeHtml(String(s.value))}</span></div>`)));
+    stats.forEach((s) => grid.appendChild(el(`<div class="stat-card ${s.cls}">
+      <div class="stat-top"><span class="stat-icon">${DAPUR_STAT_ICONS[s.icon]}</span><span class="stat-label">${s.label}</span></div>
+      <span class="stat-value" style="font-size:20px">${escapeHtml(String(s.value))}</span>
+    </div>`)));
   }
   function renderDapurAlertStrip(sppg) {
     const strip = document.getElementById("dapurAlertStrip");
@@ -1648,6 +1814,119 @@
     });
   }
 
+  /* ---------- Pengumuman Nasional & Kolaborasi Antar Dapur --------------
+     Rendering + interaction for the three new Dapur-overview panels. Kept
+     as small, independently-callable functions (same pattern as the rest
+     of the dapur render* functions) so both initDapurDashboard() and the
+     20s ticker can refresh them cheaply without touching anything else. */
+  function renderDapurAnnouncements() {
+    const list = document.getElementById("dapurAnnouncementList");
+    if (!list) return;
+    if (!NATIONAL_ANNOUNCEMENTS.length) { list.innerHTML = `<li class="muted">Belum ada pengumuman.</li>`; return; }
+    list.innerHTML = NATIONAL_ANNOUNCEMENTS.slice(0, 5).map((a) => `
+      <li class="announcement-item">
+        <div class="announcement-top"><strong>${escapeHtml(a.title)}</strong><span class="muted">${a.time}</span></div>
+        <div class="announcement-body">${escapeHtml(a.body)}</div>
+        <div class="announcement-from muted">— ${escapeHtml(a.from)}</div>
+      </li>`).join("");
+  }
+  function renderDapurNetwork(sppg) {
+    const list = document.getElementById("dapurNetworkList");
+    if (!list) return;
+    const nearby = nearestSppgTo(sppg, 4);
+    list.innerHTML = nearby.map((n) => `
+      <li class="network-item">
+        <span class="dot dot-${n.status}" title="${escapeHtml(statusLabel(n.status))}"></span>
+        <div class="network-text">
+          <strong>${escapeHtml(n.name)}</strong>
+          <span class="muted">${escapeHtml(n.city)}, ${escapeHtml(n.province)}</span>
+        </div>
+        <button class="btn-ghost network-help-btn" data-target="${n.id}">Minta Bantuan</button>
+      </li>`).join("");
+  }
+  function renderDapurCollabLog(sppg) {
+    const list = document.getElementById("dapurCollabLog");
+    if (!list) return;
+    // Scoped exactly like ALERTS: only entries where THIS kitchen is the
+    // sender or the recipient — never a third kitchen's exchange.
+    const mine = DAPUR_COLLAB_LOG.filter((r) => r.fromId === sppg.id || r.toId === sppg.id).slice(0, 10);
+    if (!mine.length) { list.innerHTML = `<li class="muted">Belum ada interaksi kolaborasi antar dapur.</li>`; return; }
+    list.innerHTML = mine.map((r) => {
+      const outgoing = r.fromId === sppg.id;
+      const direction = outgoing ? `Anda → ${escapeHtml(r.toName)}` : `${escapeHtml(r.fromName)} → Anda`;
+      const incomingPending = !outgoing && r.status === "PENDING";
+      const statusCls = r.status === "DISETUJUI" ? "accent-green" : r.status === "PENDING" ? "accent-cyan" : "accent-orange";
+      return `<li class="collab-item">
+        <div class="collab-top"><strong>${direction}</strong><span class="collab-status ${statusCls}">${r.status}</span></div>
+        <div class="collab-detail muted">${escapeHtml(r.kind)} — ${escapeHtml(r.detail)} · ${r.time}</div>
+        ${incomingPending ? `<div class="collab-actions">
+          <button class="btn-ghost collab-approve" data-collab-id="${r.id}">Setujui</button>
+          <button class="btn-ghost collab-decline" data-collab-id="${r.id}">Tolak</button>
+        </div>` : ""}
+      </li>`;
+    }).join("");
+  }
+  function wireDapurCollabInteractions(sppg) {
+    const netList = document.getElementById("dapurNetworkList");
+    if (netList && !netList.dataset.wired) {
+      netList.dataset.wired = "1";
+      netList.addEventListener("click", (e) => {
+        const btn = e.target.closest(".network-help-btn");
+        if (!btn || btn.disabled) return;
+        const target = sppgById(btn.dataset.target);
+        if (!target) return;
+        btn.disabled = true;
+        const originalLabel = btn.textContent;
+        btn.textContent = "Mengirim...";
+        const rec = requestDapurCollab(sppg, target);
+        renderDapurCollabLog(sppg);
+        setTimeout(() => {
+          resolveDapurCollab(rec);
+          renderDapurCollabLog(sppg);
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }, 2600 + Math.random() * 2200);
+      });
+    }
+    const logList = document.getElementById("dapurCollabLog");
+    if (logList && !logList.dataset.wired) {
+      logList.dataset.wired = "1";
+      logList.addEventListener("click", (e) => {
+        const approveBtn = e.target.closest(".collab-approve");
+        const declineBtn = e.target.closest(".collab-decline");
+        if (!approveBtn && !declineBtn) return;
+        const rec = DAPUR_COLLAB_LOG.find((r) => r.id === (approveBtn || declineBtn).dataset.collabId);
+        if (!rec) return;
+        respondDapurCollab(rec, !!approveBtn);
+        renderDapurCollabLog(sppg);
+      });
+    }
+  }
+  function initDapurQaPanel(sppg) {
+    const btnAnn = document.getElementById("dapurQaAnnouncement");
+    if (!btnAnn || btnAnn.dataset.wired) return;
+    btnAnn.dataset.wired = "1";
+    const btnReq = document.getElementById("dapurQaIncomingRequest");
+    function log(msg) {
+      const l = document.getElementById("dapurQaLog");
+      if (!l) return;
+      const t = new Date().toLocaleTimeString("id-ID", { hour12: false });
+      l.prepend(el(`<div class="qa-log-entry">[${t}] ${escapeHtml(msg)}</div>`));
+      while (l.children.length > 20) l.removeChild(l.lastChild);
+    }
+    btnAnn.addEventListener("click", () => {
+      const a = spawnAnnouncement();
+      renderDapurAnnouncements();
+      log(`Pengumuman baru disimulasikan: "${a.title}".`);
+    });
+    btnReq.addEventListener("click", () => {
+      const rec = simulateIncomingCollabRequest(sppg);
+      if (!rec) return;
+      renderDapurCollabLog(sppg);
+      log(`Permintaan bantuan masuk disimulasikan dari ${rec.fromName} (${rec.kind}).`);
+    });
+  }
+
   function initDapurDashboard(session) {
     const sppg = sppgById(session.sppgId);
     if (!sppg) { showLoginGate(); return; }
@@ -1667,6 +1946,11 @@
     renderDapurSensor(sppg);
     renderDapurAudit(sppg);
     renderFavoriteList();
+    renderDapurAnnouncements();
+    renderDapurNetwork(sppg);
+    renderDapurCollabLog(sppg);
+    wireDapurCollabInteractions(sppg);
+    initDapurQaPanel(sppg);
 
     // Lightweight live refresh — only the small set of dapur widgets that
     // show live-ish numbers, not the whole (much heavier) admin pipeline.
@@ -1676,6 +1960,14 @@
       renderDapurHeader(fresh);
       renderDapurStats(fresh, profile);
       renderDapurAlertStrip(fresh);
+      // Keep the announcement/collaboration widgets feeling alive too —
+      // low-probability so it reads as occasional real activity rather
+      // than a metronome.
+      if (Math.random() < 0.2) spawnAnnouncement();
+      renderDapurAnnouncements();
+      renderDapurNetwork(fresh);
+      if (Math.random() < 0.12) simulateIncomingCollabRequest(fresh);
+      renderDapurCollabLog(fresh);
     });
 
     const clockNode = document.getElementById("dapurClock");
@@ -1792,12 +2084,27 @@
     document.getElementById("settingsAccountInfo").textContent = `${session.name} — ${session.title}`;
 
     state.appMode = session.role === "dapur" ? "dapur" : "admin";
+    // Needed so the live-simulation tick can tell "an alert about MY
+    // kitchen" apart from "an alert about some other SPPG nationwide" —
+    // see the toastAllowed check in runLiveSimulationTick.
+    state.dapurSppgId = session.sppgId || null;
     document.getElementById("sidebarNavAdmin").hidden = state.appMode !== "admin";
     document.getElementById("sidebarNavDapur").hidden = state.appMode !== "dapur";
     document.getElementById("bottomNavAdmin").hidden = state.appMode !== "admin";
     document.getElementById("bottomNavDapur").hidden = state.appMode !== "dapur";
     document.getElementById("topbarSub").textContent = state.appMode === "dapur" ? "Dashboard Dapur Saya" : "National Monitoring Command Center";
     document.getElementById("globalSearch").closest(".topbar-search").hidden = state.appMode === "dapur";
+    // The bell shows ALERTS, which is the nationwide alert list — only
+    // meaningful for the admin/audit command-center view. A Dapur (kitchen)
+    // account should only ever see alerts about its own kitchen, which the
+    // "Perhatian Untuk Dapur Anda" panel on their own dashboard already
+    // covers; the shared topbar bell must stay hidden for that role.
+    document.getElementById("notifToggle").hidden = state.appMode === "dapur";
+    notifPanel.hidden = true;
+    const qaPanelEl = document.getElementById("qaPanel");
+    if (qaPanelEl) qaPanelEl.hidden = state.appMode === "dapur";
+    const dapurQaPanelEl = document.getElementById("dapurQaPanel");
+    if (dapurQaPanelEl) dapurQaPanelEl.hidden = state.appMode !== "dapur";
 
     if (!dashboardBooted) {
       dashboardBooted = true;

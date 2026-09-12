@@ -1,0 +1,284 @@
+
+/* =========================================================================
+   MBG WATCH — 2026 VISUAL REFRESH LAYER
+   Loaded after the base design system. Upgrades color depth, glass
+   surfaces, typography, motion and micro-interactions while keeping every
+   original selector, grid, and breakpoint untouched (so functionality and
+   responsiveness are unaffected — this only restyles the surface).
+   Kept CSS-only (no new images/fonts) so page weight barely moves.
+   ========================================================================= */
+
+:root {
+  /* Richer, more dimensional tokens layered on top of the base palette */
+  --radius-md: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+
+  --accent-gradient: linear-gradient(135deg, #F2CA6E 0%, #D9B33F 42%, #3DD6E8 100%);
+  --accent-gradient-soft: linear-gradient(135deg, rgba(242,202,110,0.16), rgba(61,214,232,0.12));
+  --glass-top: rgba(255,255,255,0.05);
+  --glass-line: rgba(255,255,255,0.09);
+
+  --shadow-card:
+    0 1px 1px rgba(0,0,0,.25),
+    0 14px 34px -14px rgba(2,8,23,.65),
+    inset 0 1px 0 rgba(255,255,255,.045);
+  --shadow-elevated:
+    0 2px 4px rgba(0,0,0,.3),
+    0 28px 60px -20px rgba(2,8,23,.75),
+    inset 0 1px 0 rgba(255,255,255,.06);
+  --shadow-glow-gold: 0 0 0 1px rgba(217,179,63,.35), 0 8px 28px -6px rgba(217,179,63,.35);
+  --shadow-glow-cyan: 0 0 0 1px rgba(50,199,230,.3), 0 8px 28px -6px rgba(50,199,230,.3);
+
+  --ease-out: cubic-bezier(.16,.84,.32,1);
+}
+
+[data-theme="light"] {
+  --glass-top: rgba(255,255,255,0.55);
+  --glass-line: rgba(7,26,82,0.08);
+  --shadow-card:
+    0 1px 1px rgba(7,26,82,.03),
+    0 14px 30px -16px rgba(7,26,82,.16),
+    inset 0 1px 0 rgba(255,255,255,.6);
+  --shadow-elevated:
+    0 2px 6px rgba(7,26,82,.05),
+    0 24px 50px -18px rgba(7,26,82,.2),
+    inset 0 1px 0 rgba(255,255,255,.7);
+  --accent-gradient: linear-gradient(135deg, #C99A1E 0%, #A97805 45%, #1B8197 100%);
+  --accent-gradient-soft: linear-gradient(135deg, rgba(169,120,5,0.12), rgba(27,129,151,0.10));
+}
+
+/* ---------- Global surface: layered aurora mesh, GPU-cheap (gradients
+   only, no images), fixed so it never adds scroll/paint cost per frame.
+   Trimmed to 2 layers (was 4) — extra overlapping radial-gradients added
+   paint cost for very little extra visible depth. */
+body {
+  background:
+    radial-gradient(ellipse 60% 46% at 12% -8%, color-mix(in srgb, var(--accent-cyan) 18%, transparent), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 105% -6%, color-mix(in srgb, var(--accent-gold) 20%, transparent), transparent 55%),
+    var(--bg-0);
+}
+[data-theme="light"] body {
+  background:
+    radial-gradient(ellipse 60% 46% at 12% -8%, rgba(27,129,151,0.10), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 105% -6%, rgba(169,120,5,0.10), transparent 55%),
+    var(--bg-0);
+}
+/* background-attachment:fixed is a well-known scroll-jank source on
+   mobile Chrome/WebView (it can force the background to repaint on the
+   main thread every scroll frame instead of compositing independently).
+   Desktop keeps the subtle fixed parallax; phones/tablets get a plain
+   scrolling background instead, which is effectively free. */
+@media (max-width: 1024px) {
+  body, [data-theme="light"] body { background-attachment: scroll; }
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 20px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-gold-soft); background-clip: padding-box; }
+
+::selection { background: var(--accent-gold-dim); color: var(--text-hi); }
+
+/* Subtle top accent line across the whole app — a small "premium product"
+   signature seen on modern 2026 dashboards, purely decorative/fixed. */
+.app-shell::after {
+  content: ""; position: fixed; top: 0; left: 0; right: 0; height: 2px; z-index: 50;
+  background: var(--accent-gradient); opacity: .8; pointer-events: none;
+}
+
+/* ---------- Sidebar / topbar: deeper glass, soft inner highlight ---------- */
+.sidebar {
+  background: color-mix(in srgb, var(--bg-1) 82%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-right: 1px solid var(--glass-line);
+  box-shadow: 1px 0 0 var(--glass-top) inset;
+}
+.topbar {
+  background: color-mix(in srgb, var(--bg-1) 80%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--glass-line);
+}
+.sidebar-brand .brand-mark img, .login-brand .brand-mark img, .topbar .brand-mark img {
+  box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 3px var(--accent-gold-soft);
+  border-radius: 50%;
+}
+
+.nav-item { border-radius: 12px; transition: background .2s var(--ease-out), color .2s var(--ease-out), transform .15s var(--ease-out); }
+.nav-item:hover { transform: translateX(2px); }
+.nav-item.is-active {
+  background: var(--accent-gradient-soft);
+  color: var(--accent-gold);
+  box-shadow: inset 0 0 0 1px rgba(217,179,63,.25);
+}
+
+/* ---------- Cards / panels: rounder, deeper shadow, smoother hover lift --- */
+.stat-card, .panel, .risk-card, .cctv-card, .menu-day-card, .role-card,
+.login-shell, .modal, .strip-item, .sppg-card {
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: transform .28s var(--ease-out), box-shadow .28s var(--ease-out), border-color .28s var(--ease-out);
+}
+.stat-card:hover, .risk-card:hover, .cctv-card:hover, .sppg-card:hover, .role-card:hover {
+  box-shadow: var(--shadow-elevated);
+  transform: translateY(-3px);
+}
+.panel { border-radius: var(--radius-xl); }
+.panel-head { border-bottom: 1px solid var(--glass-line); }
+.modal { border-radius: var(--radius-xl); box-shadow: var(--shadow-elevated); }
+
+.stat-card { position: relative; overflow: hidden; }
+.stat-card::before {
+  content: ""; position: absolute; inset: 0; opacity: 0; background: var(--accent-gradient-soft);
+  transition: opacity .3s var(--ease-out); pointer-events: none;
+}
+.stat-card:hover::before { opacity: 1; }
+.stat-card > * { position: relative; z-index: 1; }
+
+.stat-icon { border-radius: 10px; box-shadow: 0 4px 14px -4px currentColor; }
+
+/* ---------- Typography: sharper hierarchy, gradient accent on headings -- */
+.view-header h1 {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  letter-spacing: -.02em;
+}
+.splash-word {
+  background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.brand-title { letter-spacing: -.01em; }
+.stat-card .stat-value { letter-spacing: -.01em; }
+
+/* ---------- Buttons: gradient fill + glow ---------- */
+.btn-primary {
+  background: var(--accent-gradient); border: none; color: #16110a;
+  box-shadow: var(--shadow-glow-gold);
+  transition: filter .2s var(--ease-out), transform .18s var(--ease-out), box-shadow .2s var(--ease-out);
+}
+.btn-primary:hover { filter: brightness(1.06); transform: translateY(-2px); box-shadow: 0 0 0 1px rgba(217,179,63,.45), 0 14px 34px -8px rgba(217,179,63,.45); }
+.btn-primary:active { transform: translateY(0); }
+.btn-ghost {
+  border-radius: 12px;
+  transition: border-color .2s var(--ease-out), color .2s var(--ease-out), transform .18s var(--ease-out), background .2s var(--ease-out);
+}
+.btn-ghost:hover { transform: translateY(-2px); background: var(--bg-2); }
+
+.chip { border-radius: 20px; transition: all .2s var(--ease-out); }
+.chip:hover { border-color: var(--accent-gold-soft); transform: translateY(-1px); }
+.chip.is-active { background: var(--accent-gradient-soft); box-shadow: inset 0 0 0 1px rgba(217,179,63,.3); }
+
+.icon-btn, .map-zoom-controls button, .modal-close {
+  border-radius: 10px;
+  transition: all .2s var(--ease-out);
+}
+.icon-btn:hover, .map-zoom-controls button:hover, .modal-close:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); }
+
+/* ---------- Status dots: crisper glow ---------- */
+.dot-normal { box-shadow: 0 0 10px 1px var(--accent-green); }
+.dot-monitoring { box-shadow: 0 0 10px 1px var(--accent-cyan); }
+.dot-warning { box-shadow: 0 0 10px 1px var(--accent-orange); }
+.dot-critical { box-shadow: 0 0 10px 1px var(--accent-red); }
+
+/* ---------- Map & CCTV surfaces: subtle glass + rounder frame ---------- */
+.panel-map, .panel-map-large { border-radius: var(--radius-xl); }
+.map-wrap svg { box-shadow: inset 0 0 0 1px var(--glass-line); border-radius: 14px; }
+.cctv-feed { border-radius: 12px; }
+
+/* ---------- Login / splash: richer glass card with gradient hairline --- */
+.login-shell {
+  background: color-mix(in srgb, var(--bg-card) 92%, transparent);
+  backdrop-filter: blur(14px) saturate(120%); -webkit-backdrop-filter: blur(14px) saturate(120%);
+  position: relative;
+}
+.login-shell::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background: linear-gradient(160deg, rgba(217,179,63,.5), rgba(50,199,230,.15), transparent 60%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none;
+}
+.role-card { border-radius: var(--radius-lg); }
+.role-card:hover { box-shadow: var(--shadow-glow-gold); }
+
+.splash-core img.splash-logo-img { box-shadow: 0 0 0 3px rgba(255,255,255,.06); }
+
+/* ---------- Sim badge / status pills: gradient tint ---------- */
+.sim-badge { background: var(--accent-gradient-soft); border-radius: 8px; }
+.status-pill { border-radius: 20px; }
+
+/* ---------- Motion polish (respects prefers-reduced-motion already
+   defined upstream — this block adds no new unconditional animations,
+   only smoother easing curves on existing interactive states) ---------- */
+.view { animation: viewFadeIn .35s var(--ease-out) both; }
+@keyframes viewFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .view { animation: none; } }
+
+/* ---------- Fine-tune light mode legibility on new glass surfaces ------- */
+[data-theme="light"] .sidebar,
+[data-theme="light"] .topbar { border-color: var(--glass-line); }
+
+/* =========================================================================
+   MASTHEAD — hero-style view header (Overview + Dapur Overview). Folds the
+   title, logo, live status and the "simulasi/greeting" strip into one
+   cohesive card instead of three loosely-stacked text lines, and gives the
+   dashboard an actual brand mark instead of plain text on mobile.
+   ========================================================================= */
+.view-header-masthead {
+  display: block;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bg-card) 94%, transparent), color-mix(in srgb, var(--bg-2) 88%, transparent));
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius-xl);
+  padding: 16px 18px 14px;
+  box-shadow: var(--shadow-card);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.view-header-masthead::before {
+  content: ""; position: absolute; top: -60%; right: -8%; width: 240px; height: 240px;
+  background: radial-gradient(circle, var(--accent-gold-dim), transparent 72%);
+  pointer-events: none;
+}
+.masthead-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 16px; flex-wrap: wrap; position: relative; z-index: 1;
+}
+.masthead-id { display: flex; align-items: center; gap: 13px; min-width: 0; }
+.masthead-logo {
+  flex-shrink: 0; width: 48px; height: 48px; border-radius: 50%; overflow: hidden;
+  box-shadow: 0 0 0 2px var(--bg-1), 0 0 0 3px var(--accent-gold-soft), 0 6px 16px -6px rgba(0,0,0,.4);
+}
+.masthead-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.view-header-masthead h1 { margin: 0 0 2px; }
+.view-header-masthead .view-header-meta { position: relative; z-index: 1; }
+.masthead-bottom {
+  position: relative; z-index: 1; margin-top: 13px; padding-top: 12px;
+  border-top: 1px dashed var(--glass-line);
+}
+.masthead-bottom.badge-row { margin-bottom: 0; }
+.masthead-bottom #dapurGreeting { margin: 0; }
+
+@media (max-width: 640px) {
+  .view-header-masthead { padding: 14px 14px 12px; }
+  .masthead-logo { width: 40px; height: 40px; }
+  .masthead-top { gap: 10px; }
+  .view-header-masthead .view-header-meta { align-items: flex-start; width: 100%; }
+}
+
+/* Small brand mark in the mobile topbar — previously hamburger + plain
+   text only, with no visual identity at all on phones. */
+.topbar-logo {
+  width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  box-shadow: 0 0 0 1.5px var(--glass-line);
+}
+.topbar-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Every accent gets the same "top border" treatment gold already had —
+   so a problem card (offline CCTV, delayed distribution, critical count)
+   reads as a problem at a glance, not just via a small icon tint. */
+.stat-card.accent-green { border-top: 2px solid color-mix(in srgb, var(--accent-green) 45%, transparent); }
+.stat-card.accent-cyan { border-top: 2px solid color-mix(in srgb, var(--accent-cyan) 45%, transparent); }
+.stat-card.accent-orange { border-top: 2px solid color-mix(in srgb, var(--accent-orange) 50%, transparent); }
+.stat-card.accent-red { border-top: 2px solid color-mix(in srgb, var(--accent-red) 50%, transparent); }
+.stat-card.accent-gray { border-top: 2px solid color-mix(in srgb, var(--accent-gray) 45%, transparent); }

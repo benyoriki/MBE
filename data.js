@@ -342,6 +342,28 @@ const NATIONAL_SIMULATION = {
 };
 
 /* =========================================================================
+   LIVE PULSE — angka nasional yang "berjalan" (meals served, kendaraan
+   aktif, petugas bertugas, admin online) untuk memberi kesan sistem yang
+   benar-benar hidup saat didemokan/diuji. Terpisah total dari SPPG_DATA:
+   murni kosmetik, tidak memengaruhi status/risk score dapur mana pun.
+   ========================================================================= */
+const LIVE_PULSE = {
+  mealsToday: 812430,
+  childrenServed: 662114,
+  vehiclesActive: 1866,
+  staffOnDuty: 9820,
+  adminOnline: 14,
+};
+function livePulseRandInt(min, max) { return Math.floor(min + Math.random() * (max - min + 1)); }
+function tickLivePulse() {
+  LIVE_PULSE.mealsToday += livePulseRandInt(40, 260);
+  LIVE_PULSE.childrenServed += livePulseRandInt(20, 140);
+  LIVE_PULSE.vehiclesActive = Math.max(1500, Math.min(2200, LIVE_PULSE.vehiclesActive + livePulseRandInt(-3, 4)));
+  LIVE_PULSE.staffOnDuty = Math.max(9000, Math.min(10500, LIVE_PULSE.staffOnDuty + livePulseRandInt(-15, 20)));
+  LIVE_PULSE.adminOnline = Math.max(6, Math.min(24, LIVE_PULSE.adminOnline + (Math.random() < 0.5 ? -1 : 1)));
+}
+
+/* =========================================================================
    ALERTS — dibangkitkan dari kondisi nyata tiap SPPG (bukan daftar statis),
    supaya Early Warning benar-benar terhubung ke CCTV/Produksi/Distribusi/
    Sensor/Audit tiap dapur.
@@ -412,11 +434,24 @@ const SYNTHETIC_ALERT_TEMPLATES = [
   { level: "warning", category: "SENSOR", message: () => `Kelembapan ruang penyimpanan di luar rentang ideal.` },
   { level: "monitoring", category: "AUDIT", message: () => `Checklist kebersihan harian belum ditandai selesai oleh petugas.` },
   { level: "critical", category: "DISTRIBUTION", message: () => `${randInt(2, 5)} titik pengiriman melaporkan keterlambatan lebih dari 1 jam.` },
+  { level: "warning", category: "STAFF", message: () => `Petugas dapur kurang ${randInt(1, 3)} orang dari jadwal shift hari ini.` },
+  { level: "monitoring", category: "STAFF", message: () => `Pergantian shift petugas tercatat, serah terima checklist sedang diverifikasi.` },
+  { level: "warning", category: "HYGIENE", message: () => `Checklist sanitasi peralatan masak belum ditandai selesai lebih dari 2 jam.` },
+  { level: "critical", category: "HYGIENE", message: () => `Indikasi kontaminasi silang pada area penyimpanan bahan mentah, perlu inspeksi segera.` },
+  { level: "monitoring", category: "LOGISTICS", message: () => `Stok bahan baku untuk menu besok tersisa ${randInt(20, 45)}%.` },
+  { level: "warning", category: "LOGISTICS", message: () => `Pengiriman bahan baku dari pemasok tertunda ${randInt(1, 4)} jam.` },
 ];
 let syntheticAlertSeq = 1;
-function spawnSyntheticAlert() {
-  const sppg = pick(SPPG_DATA);
-  const tpl = pick(SYNTHETIC_ALERT_TEMPLATES);
+/** spawnSyntheticAlert(forcedLevel?, forcedSppg?) — normally called by the
+ *  automatic 20s live-simulation tick with no arguments (random SPPG,
+ *  random template). The QA/testing panel in Settings reuses the exact
+ *  same function but pins the level (and optionally the SPPG) so a tester
+ *  can deterministically produce a CRITICAL/WARNING alert on demand
+ *  without waiting for the automatic simulation to roll one. */
+function spawnSyntheticAlert(forcedLevel, forcedSppg) {
+  const sppg = forcedSppg || pick(SPPG_DATA);
+  const pool = forcedLevel ? SYNTHETIC_ALERT_TEMPLATES.filter((t) => t.level === forcedLevel) : SYNTHETIC_ALERT_TEMPLATES;
+  const tpl = pick(pool.length ? pool : SYNTHETIC_ALERT_TEMPLATES);
   const alert = {
     id: `ALT-RT-${String(syntheticAlertSeq++).padStart(4, "0")}`,
     sppgId: sppg.id,
@@ -432,6 +467,154 @@ function spawnSyntheticAlert() {
   ALERTS.unshift(alert);
   return alert;
 }
+/** qaResolveRandomAlert() — used by the testing panel's "Selesaikan 1 Alert
+ *  Acak" button: jumps a random non-resolved alert straight to RESOLVED
+ *  instead of stepping it through the workflow one stage at a time
+ *  (progressRandomAlert already covers the gradual/automatic case). */
+function qaResolveRandomAlert() {
+  const open = ALERTS.filter((a) => a.status !== "RESOLVED");
+  if (!open.length) return null;
+  const a = pick(open);
+  a.status = "RESOLVED";
+  return a;
+}
+/** qaForceSppgOffline() — used by the testing panel's "Jadikan 1 SPPG
+ *  Offline" button: pushes one random SPPG's CCTV fully offline, lets the
+ *  existing deterministic risk engine (deriveSPPGStatus) recompute its
+ *  status/score from that new condition, and raises a matching CRITICAL
+ *  alert — so testers can see the whole chain (map marker → risk score →
+ *  alert → notification) react to a single manual trigger. */
+function qaForceSppgOffline(forcedSppg) {
+  const s = forcedSppg || pick(SPPG_DATA);
+  s.cctv.status = "offline";
+  s.cctv.camerasOnline = 0;
+  s.cctv.offlineMinutes = randInt ? randInt(60, 120) : 90;
+  const derived = deriveSPPGStatus(s);
+  s.status = derived.status;
+  s.riskScore = derived.riskScore;
+  s.riskBreakdown = derived.breakdown;
+  const alert = {
+    id: `ALT-QA-${String(syntheticAlertSeq++).padStart(4, "0")}`,
+    sppgId: s.id,
+    sppgName: s.name,
+    level: "critical",
+    category: "CCTV",
+    message: `Seluruh ${s.cctv.camerasTotal} kamera CCTV offline selama ${s.cctv.offlineMinutes} menit (dipicu manual untuk pengujian).`,
+    time: "Baru saja",
+    createdAt: Date.now(),
+    status: "OPEN",
+    riskImpact: -18,
+  };
+  ALERTS.unshift(alert);
+  return { sppg: s, alert };
+}
+/** randomViewerCount(sppgId) — small cosmetic touch for the SPPG detail
+ *  modal: shows "N admin lain sedang melihat" so the dashboard feels like
+ *  a live multi-user system rather than a single-viewer static page.
+ *  Purely decorative, re-rolled each time a detail modal is opened. */
+function randomViewerCount() {
+  return Math.random() < 0.55 ? 0 : Math.floor(1 + Math.random() * 4);
+}
+
+/* =========================================================================
+   PENGUMUMAN NASIONAL & KOLABORASI ANTAR DAPUR
+   Two lightweight, deliberately-scoped social/informational layers on top
+   of the incident-driven ALERTS system:
+     - NATIONAL_ANNOUNCEMENTS: top-down broadcasts from "Tim Pusat" to every
+       kitchen — same content for everyone, so no privacy concern.
+     - DAPUR_COLLAB_LOG: a simulated peer-to-peer "minta bantuan antar
+       dapur" flow (borrow ingredients/staff/vehicle from a nearby kitchen).
+       Each kitchen only ever sees log entries where it is the sender or
+       the recipient (enforced by the render function's filter, mirroring
+       how ALERTS is scoped per-kitchen) — nobody sees a *third* kitchen's
+       request, only their own two-way exchanges.
+   ========================================================================= */
+const ANNOUNCEMENT_TEMPLATES = [
+  { title: "Pembaruan SOP Kebersihan Dapur", body: "Tim Pusat merilis pembaruan SOP kebersihan alat masak dan area penyimpanan bahan baku, berlaku mulai minggu depan." },
+  { title: "Penyesuaian Jadwal Distribusi", body: "Jadwal distribusi di beberapa wilayah disesuaikan menjelang hari libur nasional mendatang — mohon konfirmasi kesiapan dapur masing-masing." },
+  { title: "Pelatihan Daring: Manajemen Stok Bahan Baku", body: "Sesi pelatihan daring untuk seluruh kepala dapur akan diadakan pekan ini, membahas efisiensi stok dan pengurangan food waste." },
+  { title: "Pembaruan Formulir Laporan Produksi", body: "Formulir pelaporan produksi harian mendapat kolom baru: catatan kualitas bahan baku yang diterima." },
+  { title: "Imbauan Musim Hujan", body: "Mohon pastikan area penyimpanan bahan baku terlindung dari kebocoran/rembesan air selama musim hujan." },
+  { title: "Verifikasi Data Kontak Dapur", body: "Setiap dapur mohon memverifikasi ulang nomor kontak PIC yang terdaftar di sistem sebelum akhir bulan." },
+  { title: "Apresiasi Kinerja Mingguan", body: "Terima kasih atas kinerja distribusi tepat waktu minggu ini — pertahankan dan terus tingkatkan koordinasi antar dapur." },
+];
+let announcementSeq = 1;
+const NATIONAL_ANNOUNCEMENTS = ANNOUNCEMENT_TEMPLATES.slice(0, 3).map((t, i) => ({
+  id: `ANN-${String(announcementSeq++).padStart(3, "0")}`,
+  title: t.title,
+  body: t.body,
+  from: "Tim Pusat MBG Watch",
+  time: i === 0 ? "1 hari lalu" : `${i + 1} hari lalu`,
+  createdAt: Date.now() - (i + 1) * 86400000,
+}));
+function spawnAnnouncement() {
+  const t = pick(ANNOUNCEMENT_TEMPLATES);
+  const a = {
+    id: `ANN-${String(announcementSeq++).padStart(3, "0")}`,
+    title: t.title, body: t.body, from: "Tim Pusat MBG Watch",
+    time: "Baru saja", createdAt: Date.now(),
+  };
+  NATIONAL_ANNOUNCEMENTS.unshift(a);
+  while (NATIONAL_ANNOUNCEMENTS.length > 12) NATIONAL_ANNOUNCEMENTS.pop();
+  return a;
+}
+
+/** nearestSppgTo(sppg, n) — n closest other kitchens by straight-line
+ *  lat/lng distance. Used for the "Jaringan Dapur Terdekat" panel; only
+ *  ever exposes name/city/status-dot (already effectively public via the
+ *  Peta view), never another kitchen's alerts/production/CCTV detail. */
+function nearestSppgTo(sppg, n) {
+  return SPPG_DATA.filter((s) => s.id !== sppg.id)
+    .map((s) => ({ s, d: (s.lat - sppg.lat) ** 2 + (s.lng - sppg.lng) ** 2 }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, n)
+    .map((x) => x.s);
+}
+
+const COLLAB_KINDS = [
+  { kind: "Bahan Baku", detail: () => `${randInt(20, 80)} kg bahan baku cadangan` },
+  { kind: "Tenaga Bantuan", detail: () => `${randInt(1, 3)} orang tenaga bantu untuk shift hari ini` },
+  { kind: "Kendaraan Distribusi", detail: () => `pinjaman 1 unit kendaraan distribusi` },
+];
+let collabSeq = 1;
+const DAPUR_COLLAB_LOG = []; // { id, fromId, fromName, toId, toName, kind, detail, status, time }
+function requestDapurCollab(fromSppg, toSppg, kindOverride) {
+  const k = (kindOverride && COLLAB_KINDS.find((c) => c.kind === kindOverride)) || pick(COLLAB_KINDS);
+  const rec = {
+    id: `COLLAB-${String(collabSeq++).padStart(4, "0")}`,
+    fromId: fromSppg.id, fromName: fromSppg.name,
+    toId: toSppg.id, toName: toSppg.name,
+    kind: k.kind, detail: k.detail(),
+    status: "PENDING",
+    time: "Baru saja",
+    createdAt: Date.now(),
+  };
+  DAPUR_COLLAB_LOG.unshift(rec);
+  while (DAPUR_COLLAB_LOG.length > 40) DAPUR_COLLAB_LOG.pop();
+  return rec;
+}
+/** resolveDapurCollab() — used when the OUTGOING side's request auto-settles
+ *  after a short delay (simulating the other kitchen's own response). */
+function resolveDapurCollab(rec) {
+  rec.status = Math.random() < 0.75 ? "DISETUJUI" : "TIDAK BISA MEMBANTU";
+  rec.time = "Baru saja";
+  return rec;
+}
+/** respondDapurCollab() — used when MY kitchen is the recipient of an
+ *  incoming request and the user taps Setujui/Tolak themselves. */
+function respondDapurCollab(rec, approve) {
+  rec.status = approve ? "DISETUJUI" : "DITOLAK";
+  rec.time = "Baru saja";
+  return rec;
+}
+/** simulateIncomingCollabRequest() — a nearby kitchen asks MINE for help;
+ *  used by the automatic dapur tick and the dapur testing panel. */
+function simulateIncomingCollabRequest(mySppg) {
+  const others = nearestSppgTo(mySppg, 5);
+  if (!others.length) return null;
+  return requestDapurCollab(pick(others), mySppg);
+}
+
 const ALERT_STATUS_FLOW = ["OPEN", "ASSIGNED", "VERIFYING", "RESOLVED"];
 function progressRandomAlert() {
   const open = ALERTS.filter((a) => a.status !== "RESOLVED");

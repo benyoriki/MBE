@@ -1,0 +1,138 @@
+/* =========================================================================
+   MBG WATCH — LIVE INTERACTIONS LAYER
+   Styles for: Live Pulse national counters strip (Overview) and the QA /
+   Testing panel (Settings). Additive only — no existing selectors touched.
+   ========================================================================= */
+
+/* ---------- Live Pulse strip ---------- */
+.pulse-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.pulse-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md, 16px); padding: 12px 14px;
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+}
+.pulse-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent-cyan); box-shadow: 0 0 8px var(--accent-cyan);
+  animation: pulseDotBreathe 2.4s ease-in-out infinite;
+}
+.pulse-dot-live { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+@keyframes pulseDotBreathe { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .pulse-dot { animation: none; } }
+
+.pulse-text { display: flex; flex-direction: column; min-width: 0; }
+.pulse-value {
+  font-family: var(--font-mono); font-weight: 800; font-size: 17px;
+  color: var(--text-hi); letter-spacing: -.01em;
+  transition: color .25s ease;
+}
+.pulse-label {
+  font-size: 10.5px; color: var(--text-lo); letter-spacing: .01em;
+  overflow-wrap: anywhere; line-height: 1.3; margin-top: 1px;
+}
+.pulse-item-admin .pulse-value { color: var(--accent-green); }
+
+/* Brief highlight flash whenever a counter actually changes value —
+   makes the "liveness" readable, not just a silently updated number. */
+.pulse-value.pulse-flash { color: var(--accent-gold); }
+
+@media (max-width: 1024px) {
+  .pulse-strip { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 640px) {
+  .pulse-strip {
+    grid-template-columns: none;
+    grid-auto-flow: column; grid-auto-columns: minmax(180px, 1fr);
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity; margin: 0 -14px 16px; padding: 0 14px 2px;
+    -ms-overflow-style: none; scrollbar-width: none;
+    mask-image: linear-gradient(90deg, #000 92%, transparent);
+  }
+  .pulse-strip::-webkit-scrollbar { display: none; }
+  .pulse-item { scroll-snap-align: start; }
+}
+
+/* ---------- QA / Testing panel ---------- */
+.qa-panel { margin-top: 4px; }
+.qa-intro { padding: 0 18px 4px; font-size: 12.5px; line-height: 1.55; }
+.qa-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+  padding: 10px 18px 6px;
+}
+@media (max-width: 640px) { .qa-grid { grid-template-columns: 1fr; } }
+.qa-btn {
+  display: flex; align-items: center; gap: 10px; justify-content: flex-start;
+  text-align: left; width: 100%;
+}
+.qa-btn-icon { flex-shrink: 0; }
+.qa-btn.is-armed { border-color: var(--accent-gold-soft); color: var(--accent-gold); }
+
+.qa-log {
+  margin: 12px 18px 18px; padding: 10px 12px; max-height: 160px; overflow-y: auto;
+  background: var(--bg-2); border: 1px solid var(--border-soft); border-radius: 12px;
+  font-family: var(--font-mono); font-size: 11.5px; color: var(--text-mid);
+  display: flex; flex-direction: column-reverse; gap: 4px;
+}
+.qa-log:empty::before {
+  content: "Belum ada aksi pengujian dijalankan pada sesi ini.";
+  color: var(--text-lo); font-family: var(--font-body); font-style: italic;
+}
+.qa-log-entry { line-height: 1.5; overflow-wrap: anywhere; animation: qaLogIn .25s ease-out; }
+@keyframes qaLogIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ---------- Viewer presence chip (SPPG detail modal) ---------- */
+.viewer-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  color: var(--accent-cyan); font-size: 11.5px; font-weight: 600;
+}
+.viewer-chip .dot { width: 6px; height: 6px; }
+
+/* ---------- Pengumuman Nasional (announcement feed) ---------- */
+.announcement-list, .network-list, .collab-log { list-style: none; margin: 0; padding: 6px 0; display: flex; flex-direction: column; }
+.announcement-item {
+  padding: 11px 18px; border-bottom: 1px solid var(--border-soft);
+}
+.announcement-item:last-child { border-bottom: none; }
+.announcement-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 3px; }
+.announcement-top strong { font-size: 13.5px; }
+.announcement-body { font-size: 12.5px; color: var(--text-mid); line-height: 1.5; margin-bottom: 3px; }
+.announcement-from { font-size: 11px; }
+
+/* ---------- Jaringan Dapur Terdekat (nearby kitchen network) ---------- */
+.network-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px; border-bottom: 1px solid var(--border-soft);
+}
+.network-item:last-child { border-bottom: none; }
+.network-item .dot { flex-shrink: 0; }
+.network-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.network-text strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.network-text .muted { font-size: 11.5px; }
+.network-help-btn { flex-shrink: 0; font-size: 12px; padding: 6px 12px; white-space: nowrap; }
+.network-help-btn:disabled { opacity: .6; cursor: default; transform: none; }
+
+/* ---------- Riwayat Kolaborasi Antar Dapur (collaboration log) ---------- */
+.collab-item { padding: 12px 18px; border-bottom: 1px solid var(--border-soft); }
+.collab-item:last-child { border-bottom: none; }
+.collab-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 3px; }
+.collab-top strong { font-size: 13px; }
+.collab-status {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .04em; padding: 3px 9px;
+  border-radius: 20px; background: color-mix(in srgb, currentColor 16%, transparent);
+  flex-shrink: 0; white-space: nowrap;
+}
+.collab-status.accent-green { color: var(--accent-green); }
+.collab-status.accent-cyan { color: var(--accent-cyan); }
+.collab-status.accent-orange { color: var(--accent-orange); }
+.collab-detail { font-size: 12px; line-height: 1.5; }
+.collab-actions { display: flex; gap: 8px; margin-top: 8px; }
+.collab-actions button { font-size: 12px; padding: 6px 14px; }
+.collab-approve { border-color: color-mix(in srgb, var(--accent-green) 45%, transparent); color: var(--accent-green); }
+.collab-decline { border-color: color-mix(in srgb, var(--accent-red) 45%, transparent); color: var(--accent-red); }

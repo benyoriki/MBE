@@ -2,6 +2,19 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8" />
+     
+     <!-- Open Graph / WhatsApp, Telegram, Facebook preview -->
+<meta property="og:title" content="MBE — Makan Bergizi Lebih Terarah & Terintegrasi">
+<meta property="og:description" content="Sistem digital modern untuk membantu pengelolaan, pemantauan, dan administrasi program makan bergizi dengan lebih mudah, cepat, dan terorganisir.">
+<meta property="og:image" content="https://benyoriki.github.io/MBE/preview.jpg">
+<meta property="og:image:secure_url" content="https://benyoriki.github.io/MBE/preview.jpg">
+<meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://benyoriki.github.io/MBE/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="MBE">
+     
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>MBG WATCH — Integrated Monitoring &amp; Early Warning System (Prototype)</title>
 <meta name="description" content="Prototype dashboard konsep National Monitoring Command Center untuk Program Makan Bergizi Gratis. Seluruh data pada situs ini adalah data simulasi." />
@@ -20,6 +33,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MBG Watch">
 <link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="refresh-2026.css" />
+<link rel="stylesheet" href="interactions-2026.css" />
 </head>
 <body data-theme="dark">
 
@@ -251,6 +266,7 @@
         <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
 
+      <span class="topbar-logo only-mobile" aria-hidden="true"><img src="assets/icons/logo.png" width="26" height="26" alt="" /></span>
       <div class="topbar-title">
         <span class="only-desktop">MBG WATCH</span>
         <span class="topbar-sub" id="topbarSub">National Monitoring Command Center</span>
@@ -292,22 +308,68 @@
 
       <!-- ---------- 1. OVERVIEW ---------- -->
       <section class="view" id="view-overview">
-        <div class="view-header">
-          <div>
-            <h1>MBG WATCH</h1>
-            <p class="muted">National Monitoring Command Center</p>
+        <div class="view-header view-header-masthead">
+          <div class="masthead-top">
+            <div class="masthead-id">
+              <span class="masthead-logo" aria-hidden="true"><img src="assets/icons/logo.png" width="48" height="48" alt="" /></span>
+              <div>
+                <h1>MBG WATCH</h1>
+                <p class="muted">National Monitoring Command Center</p>
+              </div>
+            </div>
+            <div class="view-header-meta">
+              <span class="status-pill"><span class="dot dot-normal"></span>SYSTEM OPERATIONAL</span>
+              <span class="datetime" id="clockDisplay"></span>
+            </div>
           </div>
-          <div class="view-header-meta">
-            <span class="status-pill"><span class="dot dot-normal"></span>SYSTEM OPERATIONAL</span>
-            <span class="datetime" id="clockDisplay"></span>
+          <!-- 2. Operational Summary -->
+          <div class="masthead-bottom badge-row">
+            <span class="sim-badge">SIMULASI NASIONAL</span>
+            <span class="muted" id="demoCountBadge">DATA DEMO: — SPPG dimuat di browser ini</span>
           </div>
         </div>
 
-        <!-- 2. Operational Summary -->
-        <div class="badge-row">
-          <span class="sim-badge">SIMULASI NASIONAL</span>
-          <span class="muted" id="demoCountBadge">DATA DEMO: — SPPG dimuat di browser ini</span>
+        <!-- Live Pulse — national counters, purely cosmetic/simulated, tick
+             every ~20s alongside the rest of the live simulation so the
+             dashboard feels genuinely alive during a demo or test session. -->
+        <div class="pulse-strip" id="pulseStrip" aria-label="Statistik nasional live (simulasi)">
+          <div class="pulse-item">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <div class="pulse-text">
+              <span class="pulse-value" id="pulseMeals">—</span>
+              <span class="pulse-label">Makanan Didistribusikan Hari Ini</span>
+            </div>
+          </div>
+          <div class="pulse-item">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <div class="pulse-text">
+              <span class="pulse-value" id="pulseChildren">—</span>
+              <span class="pulse-label">Anak Terlayani Hari Ini</span>
+            </div>
+          </div>
+          <div class="pulse-item">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <div class="pulse-text">
+              <span class="pulse-value" id="pulseVehicles">—</span>
+              <span class="pulse-label">Kendaraan Distribusi Aktif</span>
+            </div>
+          </div>
+          <div class="pulse-item">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <div class="pulse-text">
+              <span class="pulse-value" id="pulseStaff">—</span>
+              <span class="pulse-label">Petugas Bertugas</span>
+            </div>
+          </div>
+          <div class="pulse-item pulse-item-admin">
+            <span class="pulse-dot pulse-dot-live" aria-hidden="true"></span>
+            <div class="pulse-text">
+              <span class="pulse-value" id="pulseAdmin">—</span>
+              <span class="pulse-label">Admin &amp; Petugas Online Sekarang</span>
+            </div>
+          </div>
         </div>
+
         <div class="stats-grid" id="statsGrid">
           <div class="skel-stat-card"><div class="skel-line skeleton" style="width:60%"></div><div class="skel-line skeleton" style="width:40%;height:22px"></div></div>
           <div class="skel-stat-card"><div class="skel-line skeleton" style="width:60%"></div><div class="skel-line skeleton" style="width:40%;height:22px"></div></div>
@@ -536,6 +598,59 @@
             <button class="btn-ghost" id="logoutBtn">Keluar (Logout)</button>
           </div>
         </section>
+
+        <!-- ---------- QA / TESTING PANEL ----------
+             Manual triggers for demo/testing: lets a tester produce
+             alerts, offline SPPG, resolved workflows, etc. on demand
+             instead of waiting for the automatic ~20s live simulation. -->
+        <section class="panel qa-panel" id="qaPanel">
+          <div class="panel-head">
+            <h2>Panel Simulasi &amp; Pengujian</h2>
+            <span class="pill-live" id="qaSimStatusPill"><span class="pulse"></span>SIMULASI AKTIF</span>
+          </div>
+          <p class="muted qa-intro">Untuk kebutuhan demo/pengujian tampilan — picu skenario data secara manual tanpa menunggu simulasi otomatis. Semua data tetap simulasi, tersimpan hanya di browser ini.</p>
+          <div class="qa-grid">
+            <button class="btn-ghost qa-btn" id="qaTriggerCritical">
+              <span class="qa-btn-icon dot dot-critical"></span> Picu Alert Kritis Baru
+            </button>
+            <button class="btn-ghost qa-btn" id="qaTriggerWarning">
+              <span class="qa-btn-icon dot dot-warning"></span> Picu Alert Warning Baru
+            </button>
+            <button class="btn-ghost qa-btn" id="qaForceOffline">
+              <span class="qa-btn-icon dot dot-offline"></span> Jadikan 1 SPPG Offline
+            </button>
+            <button class="btn-ghost qa-btn" id="qaResolveAlert">
+              <span class="qa-btn-icon dot dot-normal"></span> Selesaikan 1 Alert Acak
+            </button>
+            <button class="btn-ghost qa-btn" id="qaSpeedUp">
+              <span class="qa-btn-icon dot dot-monitoring"></span> Percepat Simulasi 30 Detik
+            </button>
+            <button class="btn-ghost qa-btn" id="qaToggleSim">
+              <span class="qa-btn-icon dot dot-monitoring"></span> Jeda Simulasi Live
+            </button>
+          </div>
+          <div class="qa-log" id="qaLog" aria-live="polite"></div>
+        </section>
+
+        <!-- Dapur-scoped testing panel — same purpose as the admin QA
+             panel above (manual triggers so a tester doesn't have to wait
+             for the automatic ~20s tick), but for the announcement/
+             inter-kitchen-collaboration widgets, which only exist on the
+             Dapur dashboard. Visibility is toggled opposite to #qaPanel
+             in showApp(). -->
+        <section class="panel qa-panel" id="dapurQaPanel" hidden>
+          <div class="panel-head"><h2>Panel Simulasi &amp; Pengujian (Dapur)</h2></div>
+          <p class="muted qa-intro">Untuk kebutuhan demo/pengujian widget Pengumuman Nasional dan Kolaborasi Antar Dapur, tanpa menunggu simulasi otomatis.</p>
+          <div class="qa-grid">
+            <button class="btn-ghost qa-btn" id="dapurQaAnnouncement">
+              <span class="qa-btn-icon dot dot-monitoring"></span> Simulasikan Pengumuman Baru
+            </button>
+            <button class="btn-ghost qa-btn" id="dapurQaIncomingRequest">
+              <span class="qa-btn-icon dot dot-warning"></span> Simulasikan Permintaan Bantuan Masuk
+            </button>
+          </div>
+          <div class="qa-log" id="dapurQaLog" aria-live="polite"></div>
+        </section>
       </section>
 
       <!-- ================================================================
@@ -545,17 +660,24 @@
 
       <!-- ---------- DAPUR: RINGKASAN ---------- -->
       <section class="view" id="view-dapur-overview" hidden>
-        <div class="view-header">
-          <div>
-            <h1 id="dapurName">SPPG —</h1>
-            <p class="muted" id="dapurLocation">—</p>
+        <div class="view-header view-header-masthead">
+          <div class="masthead-top">
+            <div class="masthead-id">
+              <span class="masthead-logo" aria-hidden="true"><img src="assets/icons/logo.png" width="44" height="44" alt="" /></span>
+              <div>
+                <h1 id="dapurName">SPPG —</h1>
+                <p class="muted" id="dapurLocation">—</p>
+              </div>
+            </div>
+            <div class="view-header-meta">
+              <span class="status-pill" id="dapurStatusPill"><span class="dot dot-normal"></span>—</span>
+              <span class="datetime" id="dapurClock"></span>
+            </div>
           </div>
-          <div class="view-header-meta">
-            <span class="status-pill" id="dapurStatusPill"><span class="dot dot-normal"></span>—</span>
-            <span class="datetime" id="dapurClock"></span>
+          <div class="masthead-bottom">
+            <p class="muted" id="dapurGreeting">Selamat datang kembali.</p>
           </div>
         </div>
-        <p class="muted" id="dapurGreeting" style="margin-top:-8px">Selamat datang kembali.</p>
 
         <div class="stats-grid" id="dapurStatsGrid"></div>
 
@@ -571,6 +693,25 @@
             <div id="dapurTodayMenu"></div>
           </section>
         </div>
+
+        <!-- Top-down broadcasts from "Tim Pusat" — same content for every
+             kitchen, so safe to show broadly (unlike ALERTS, which is
+             scoped strictly to one's own kitchen). -->
+        <div class="section-row">
+          <section class="panel">
+            <div class="panel-head"><h2>Pengumuman Nasional</h2><span class="muted">Tim Pusat MBG Watch</span></div>
+            <ul class="announcement-list" id="dapurAnnouncementList"></ul>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>Jaringan Dapur Terdekat</h2><span class="muted">Simulasi kolaborasi</span></div>
+            <ul class="network-list" id="dapurNetworkList"></ul>
+          </section>
+        </div>
+
+        <section class="panel">
+          <div class="panel-head"><h2>Riwayat Kolaborasi Antar Dapur</h2></div>
+          <ul class="collab-log" id="dapurCollabLog"></ul>
+        </section>
       </section>
 
       <!-- ---------- DAPUR: STRUKTUR & TIM ---------- -->
