@@ -207,6 +207,47 @@ function generateChatMessages(sppg) {
   return msgs;
 }
 
+function chatSpawnIncomingMessage() {
+  const sppg = pick(SPPG_DATA);
+  const messages = generateChatMessages(sppg); // ensures cache/script exists first
+  const { kepala } = chatParticipants(sppg);
+  const now = new Date();
+  const time = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false });
+  const templates = [
+    `Update: produksi sudah ${sppg.production.completion}% selesai.`,
+    `Distribusi sedang berjalan ke ${sppg.distribution.target} titik sekolah.`,
+    "Laporan checklist kebersihan dapur hari ini sudah dikirim.",
+    "Stok bahan baku hari ini sudah diterima lengkap, terima kasih.",
+    "Mohon konfirmasi jadwal audit minggu depan ya Pak/Bu.",
+    "Kendaraan distribusi baru saja berangkat dari dapur.",
+    "Sensor suhu sudah kembali normal, terima kasih atas infonya.",
+    "Petugas shift pagi sudah check-in semua, siap bertugas.",
+    "Sampel menu hari ini sudah diarsipkan sesuai SOP.",
+    "Izin info, koneksi internet dapur sempat lambat, sekarang sudah pulih.",
+    "Serah terima ke pihak sekolah sudah selesai semua, tanpa kendala.",
+    "Mohon maaf, ada revisi kecil di laporan produksi kemarin, sudah kami perbaiki.",
+  ];
+  const msg = {
+    id: `${sppg.id}-live-${Date.now()}-${Math.floor(Math.random() * 999)}`,
+    from: "dapur",
+    name: kepala,
+    text: pick(templates),
+    time,
+    day: "Hari ini",
+  };
+  messages.push(msg);
+  // Cap per-thread history so a long-running/sped-up demo session can't
+  // grow memory unbounded — matches the "jangan berat" requirement.
+  if (messages.length > 60) messages.splice(0, messages.length - 60);
+  const summary = chatSummaryFor(sppg.id);
+  if (summary) {
+    summary.lastMessage = `${kepala}: ${msg.text}`;
+    summary.minutesAgo = 0;
+    summary.unread += 1;
+  }
+  return { sppg, msg, summary };
+}
+
 function chatAutoReply(sppg, repliedToAdmin) {
   const { kepala, auditor } = chatParticipants(sppg);
   const now = new Date();

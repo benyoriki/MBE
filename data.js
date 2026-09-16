@@ -732,6 +732,11 @@ const LIVE_EVENT_POOL = [
   "Stok Bahan Baku Diterima", "Kendaraan Distribusi Tiba", "Serah Terima Selesai",
   "Checklist Kebersihan Selesai", "Petugas Check-out", "Sampel Menu Diarsipkan",
   "Laporan Harian Dikirim", "Freezer Kembali Normal", "Koneksi Internet Pulih",
+  "💬 Pesan Baru di Grup Chat Dapur", "🔔 Notifikasi Audit Terkirim",
+  "Foto Dokumentasi Diunggah", "Verifikasi Suhu Makanan Selesai",
+  "Petugas QC Memulai Inspeksi", "Timbangan Porsi Dikalibrasi Ulang",
+  "Jadwal Distribusi Diperbarui", "Sesi Video Call Verifikasi Dimulai",
+  "Laporan Insiden Ditutup", "Admin Pusat Meninjau Dashboard Dapur",
 ];
 function nowClock() {
   const d = new Date();
@@ -740,7 +745,7 @@ function nowClock() {
 function pushLiveActivity() {
   const sppg = pick(SPPG_DATA);
   ACTIVITIES.unshift({ time: nowClock(), sppg: sppg.name, text: pick(LIVE_EVENT_POOL) });
-  if (ACTIVITIES.length > 12) ACTIVITIES.length = 12;
+  if (ACTIVITIES.length > 18) ACTIVITIES.length = 18;
 }
 
 /* =========================================================================

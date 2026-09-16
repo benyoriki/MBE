@@ -197,6 +197,26 @@
     }
     if (alertsChanged && typeof refreshAlertUI === "function") refreshAlertUI();
 
+    // Chat traffic simulation: dapur keep sending in reports/updates on
+    // their own so the Chat & Pesan feature (and its unread badges/notif
+    // bell) stays busy even without a human opening every thread — the
+    // same "keep the dashboard feeling alive" idea as the alert workflow
+    // above, applied to chat.
+    if (Math.random() < 0.5) {
+      const { sppg, msg } = chatSpawnIncomingMessage();
+      if (state.activeChatSppgId === sppg.id) {
+        const summary = chatSummaryFor(sppg.id);
+        if (summary) summary.unread = 0; // already being watched live
+        if (state.view === "chat") renderChatBubbles(generateChatMessages(sppg));
+      }
+      updateChatNavBadge();
+      if (state.view === "chat" && state.appMode !== "dapur" && !document.getElementById("chatShell").classList.contains("chat-dapur-mode")) {
+        renderChatThreadList();
+      }
+      const chatToastAllowed = state.appMode === "admin" || (state.appMode === "dapur" && sppg.id === state.dapurSppgId);
+      if (chatToastAllowed) showLiveChatToast(sppg, msg);
+    }
+
     // Re-render currently visible view's live-ish widgets cheaply.
     // renderOps()/renderMiniMap() were previously only called once at
     // startup — the "Live Operations" list and the Overview mini-map sat
@@ -242,6 +262,29 @@
       </div>
     </div>`);
     toast.addEventListener("click", () => { setView(state.appMode === "dapur" ? "dapur-overview" : "alerts"); toast.remove(); });
+    stack.appendChild(toast);
+    while (stack.children.length > 3) stack.removeChild(stack.firstChild);
+    setTimeout(() => { toast.classList.add("is-leaving"); setTimeout(() => toast.remove(), 400); }, 5200);
+  }
+
+  // Same idea as showLiveToast() above but for an incoming chat message —
+  // separate function (rather than overloading showLiveToast) because a
+  // chat message isn't an "alert" (no level/status/category), just a new
+  // bubble in a thread the viewer may not have open.
+  function showLiveChatToast(sppg, msg) {
+    let stack = document.getElementById("liveToastStack");
+    if (!stack) {
+      stack = el(`<div class="live-toast-stack" id="liveToastStack" aria-live="polite"></div>`);
+      document.body.appendChild(stack);
+    }
+    const toast = el(`<div class="live-toast is-chat">
+      <span class="lt-dot"></span>
+      <div class="lt-body">
+        <div class="lt-title">💬 Chat · ${escapeHtml(sppg.name)}</div>
+        <div class="lt-msg">${escapeHtml(msg.name)}: ${escapeHtml(msg.text)}</div>
+      </div>
+    </div>`);
+    toast.addEventListener("click", () => { setView("chat"); openChatThread(sppg.id); toast.remove(); });
     stack.appendChild(toast);
     while (stack.children.length > 3) stack.removeChild(stack.firstChild);
     setTimeout(() => { toast.classList.add("is-leaving"); setTimeout(() => toast.remove(), 400); }, 5200);
@@ -332,11 +375,26 @@
   document.addEventListener("click", (e) => {
     if (!notifPanel.hidden && !notifPanel.contains(e.target) && !e.target.closest("#notifToggle")) notifPanel.hidden = true;
   });
+
+  // Chat gets its own dedicated topbar icon — deliberately separate from
+  // the alert bell/dropdown above (a dropdown-inside-a-dropdown on a phone
+  // screen was cramped and buggy). Tapping it jumps straight into the
+  // full Chat & Pesan view, closing the alert panel/mobile sheet first so
+  // nothing overlaps.
+  const chatTopbarBtn = document.getElementById("chatTopbarToggle");
+  if (chatTopbarBtn) {
+    chatTopbarBtn.addEventListener("click", () => {
+      notifPanel.hidden = true;
+      const sheet = document.getElementById("mobileMenuSheet");
+      if (sheet) sheet.hidden = true;
+      setView("chat");
+    });
+  }
   function renderNotifList() {
     const list = document.getElementById("notifList");
     const openAlerts = ALERTS.filter((a) => a.status !== "RESOLVED").slice(0, 8);
     list.innerHTML = "";
-    document.getElementById("notifCount").textContent = openAlerts.length;
+    document.getElementById("notifCount").textContent = openAlerts.length > 99 ? "99+" : openAlerts.length;
     document.querySelector("#notifPanel .notif-head strong").textContent = `${openAlerts.length} Alert Aktif`;
     const counts = { critical: 0, warning: 0, monitoring: 0 };
     ALERTS.forEach((a) => { if (a.status !== "RESOLVED" && counts[a.level] !== undefined) counts[a.level]++; });
@@ -498,9 +556,9 @@
     function tick() {
       pushLiveActivity();
       if (document.getElementById("activityTimeline")) renderActivity(true);
-      liveTickerHandle = setTimeout(tick, 4000 + Math.random() * 5000);
+      liveTickerHandle = setTimeout(tick, 3000 + Math.random() * 4000);
     }
-    liveTickerHandle = setTimeout(tick, 4000 + Math.random() * 5000);
+    liveTickerHandle = setTimeout(tick, 3000 + Math.random() * 4000);
   }
 
   /* =======================================================================
@@ -1271,7 +1329,7 @@
 
   function updateChatNavBadge() {
     const total = CHAT_THREAD_SUMMARIES.reduce((a, c) => a + c.unread, 0);
-    document.querySelectorAll(".chat-nav-badge").forEach((b) => {
+    document.querySelectorAll("[data-chat-badge]").forEach((b) => {
       b.hidden = total === 0;
       b.textContent = total > 99 ? "99+" : String(total);
     });
@@ -1879,6 +1937,39 @@
       }
       qaLog(state.simPaused ? "Simulasi live dijeda oleh pengguna." : "Simulasi live dilanjutkan.");
     });
+
+    // Fires a rapid burst of incoming chat messages across random dapur —
+    // purpose-built for stress-testing the Chat & Pesan feature (list
+    // re-render, unread badges, notif bell, toast stack) the same way
+    // qaSpeedUp stress-tests the alert workflow above.
+    const btnChatBurst = document.getElementById("qaChatBurst");
+    if (btnChatBurst) {
+      btnChatBurst.addEventListener("click", () => {
+        btnChatBurst.disabled = true;
+        const originalLabel = btnChatBurst.innerHTML;
+        qaLog("Mengirim 12 pesan chat masuk secara beruntun untuk uji performa...");
+        let count = 0;
+        const burst = setInterval(() => {
+          const { sppg, msg } = chatSpawnIncomingMessage();
+          if (state.activeChatSppgId === sppg.id) {
+            const summary = chatSummaryFor(sppg.id);
+            if (summary) summary.unread = 0;
+            if (state.view === "chat") renderChatBubbles(generateChatMessages(sppg));
+          }
+          updateChatNavBadge();
+          if (state.view === "chat" && !document.getElementById("chatShell").classList.contains("chat-dapur-mode")) renderChatThreadList();
+          showLiveChatToast(sppg, msg);
+          count++;
+          btnChatBurst.innerHTML = `<span class="qa-btn-icon dot dot-normal"></span> Mengirim pesan... (${count}/12)`;
+          if (count >= 12) {
+            clearInterval(burst);
+            btnChatBurst.innerHTML = originalLabel;
+            btnChatBurst.disabled = false;
+            qaLog("Uji beban chat selesai — 12 pesan masuk berhasil disimulasikan.");
+          }
+        }, 300);
+      });
+    }
   }
 
   /* =======================================================================

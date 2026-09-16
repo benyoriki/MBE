@@ -86,10 +86,10 @@
 .chat-thread-preview { font-size: 12px; color: var(--text-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px; min-width: 0; }
 .chat-thread-preview .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .chat-unread-badge {
+  display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent-green); color: #04250b;
   font-size: 10.5px; font-weight: 700; border-radius: 999px;
-  min-width: 18px; height: 18px; padding: 0 5px;
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  min-width: 18px; height: 18px; padding: 0 5px; flex-shrink: 0;
 }
 .chat-load-more {
   display: block; width: calc(100% - 24px); margin: 10px 12px;
@@ -180,13 +180,16 @@
   display: flex; align-items: center; justify-content: center;
 }
 
+/* ---------------- Live toast: chat variant ------------------------------ */
+.live-toast.is-chat .lt-dot { background: var(--accent-green); box-shadow: 0 0 0 3px var(--accent-green-dim); }
+
 /* Dapur role: single conversation, no list pane needed */
 .chat-shell.chat-dapur-mode .chat-list-pane { display: none; }
 .chat-shell.chat-dapur-mode .chat-back-btn { display: none !important; }
 
 /* ---------------- Responsive: single-pane on narrow screens ------------ */
 @media (max-width: 880px) {
-  .chat-shell { height: calc(100vh - var(--topbar-h) - var(--bottomnav-h) - 96px); min-height: 380px; border-radius: var(--radius-md); }
+  .chat-shell { height: min(70vh, 620px); min-height: 380px; border-radius: var(--radius-md); }
   .chat-list-pane { width: 100%; flex: 1 1 auto; }
   .chat-thread-pane { display: none; }
   .chat-back-btn { display: flex; }
