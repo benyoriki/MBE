@@ -22,6 +22,7 @@
     activeDetailTab: "overview",
     activeAlertId: null,
     activeAuditId: null,
+    activeChatSppgId: null,
     simPaused: false, // toggled by the QA/testing panel's "Jeda Simulasi Live" button
   };
 
@@ -272,13 +273,13 @@
   const MENU_ITEMS_ADMIN = [
     ["overview", "Overview"], ["map", "Peta SPPG"], ["cctv", "Monitoring CCTV"],
     ["production", "Produksi"], ["distribution", "Distribusi"], ["risk", "Risk Center"],
-    ["alerts", "Early Warning"], ["audit", "Audit & Inspeksi"], ["reports", "Laporan"],
+    ["alerts", "Early Warning"], ["audit", "Audit & Inspeksi"], ["chat", "Chat & Pesan"], ["reports", "Laporan"],
     ["analytics", "Analitik"], ["system", "System Status"], ["settings", "Pengaturan"],
   ];
   const MENU_ITEMS_DAPUR = [
     ["dapur-overview", "Ringkasan"], ["dapur-team", "Struktur & Tim"], ["dapur-menu", "Jadwal Menu"],
     ["dapur-ops", "Produksi & Distribusi"], ["dapur-cctv", "CCTV Dapur"], ["dapur-sensor", "Sensor"],
-    ["dapur-audit", "Audit Dapur"], ["settings", "Pengaturan"],
+    ["dapur-audit", "Audit Dapur"], ["chat", "Chat Pusat Audit"], ["settings", "Pengaturan"],
   ];
   const mobileSheet = document.getElementById("mobileMenuSheet");
   function openMobileSheet() {
@@ -1258,6 +1259,210 @@
   auditModal.addEventListener("click", (e) => { if (e.target === auditModal) auditModal.hidden = true; });
 
   /* =======================================================================
+     CHAT & PESAN — grup chat gaya WhatsApp antara dapur (SPPG) dan Pusat
+     Audit Nasional. Data pesan berasal dari chat-data.js (dummy/simulasi).
+     Admin: melihat & membalas daftar semua grup dapur. Dapur: langsung
+     masuk ke satu grup chat miliknya sendiri dengan Pusat Audit.
+     ======================================================================= */
+  let chatFilter = "all";
+  let chatSearchQuery = "";
+  let chatListLimit = 40;
+  let chatWired = false;
+
+  function updateChatNavBadge() {
+    const total = CHAT_THREAD_SUMMARIES.reduce((a, c) => a + c.unread, 0);
+    document.querySelectorAll(".chat-nav-badge").forEach((b) => {
+      b.hidden = total === 0;
+      b.textContent = total > 99 ? "99+" : String(total);
+    });
+  }
+
+  function renderChatThreadList() {
+    const listEl = document.getElementById("chatThreadList");
+    if (!listEl) return;
+    let items = CHAT_THREAD_SUMMARIES.slice();
+    if (chatSearchQuery) {
+      const q = chatSearchQuery.toLowerCase();
+      items = items.filter((c) => c.name.toLowerCase().includes(q) || c.city.toLowerCase().includes(q) || c.province.toLowerCase().includes(q));
+    }
+    if (chatFilter === "unread") items = items.filter((c) => c.unread > 0);
+    if (chatFilter === "alert") items = items.filter((c) => c.pinned || c.statusDot === "warning" || c.statusDot === "critical");
+    items.sort((a, b) => (b.pinned - a.pinned) || (a.minutesAgo - b.minutesAgo));
+
+    const shown = items.slice(0, chatListLimit);
+    listEl.innerHTML = "";
+    if (!shown.length) {
+      listEl.innerHTML = `<div class="muted" style="padding:24px 16px;text-align:center">Tidak ada percakapan yang cocok.</div>`;
+      updateChatNavBadge();
+      return;
+    }
+    shown.forEach((c) => {
+      const row = el(`<button type="button" class="chat-thread-item ${c.sppgId === state.activeChatSppgId ? "is-active" : ""}">
+        <span class="chat-avatar">${escapeHtml(c.avatar)}</span>
+        <span class="chat-thread-meta">
+          <span class="chat-thread-top">
+            <span class="chat-thread-name">${escapeHtml(c.name)}</span>
+            <span class="chat-thread-time">${chatRelativeTime(c.minutesAgo)}</span>
+          </span>
+          <span class="chat-thread-bottom">
+            <span class="chat-thread-preview"><span class="dot dot-${c.statusDot}"></span>${escapeHtml(c.lastMessage)}</span>
+            ${c.unread ? `<span class="chat-unread-badge">${c.unread > 99 ? "99+" : c.unread}</span>` : ""}
+          </span>
+        </span>
+      </button>`);
+      row.addEventListener("click", () => openChatThread(c.sppgId));
+      listEl.appendChild(row);
+    });
+    if (items.length > shown.length) {
+      const more = el(`<button type="button" class="chat-load-more">Tampilkan lebih banyak (${items.length - shown.length} dapur lagi)</button>`);
+      more.addEventListener("click", () => { chatListLimit += 40; renderChatThreadList(); });
+      listEl.appendChild(more);
+    }
+    updateChatNavBadge();
+  }
+
+  function renderChatBubbles(messages) {
+    const container = document.getElementById("chatMessages");
+    if (!container) return;
+    container.innerHTML = "";
+    let lastDay = null;
+    messages.forEach((msg) => {
+      if (msg.day && msg.day !== lastDay) {
+        container.appendChild(el(`<div class="chat-date-sep">${escapeHtml(msg.day)}</div>`));
+        lastDay = msg.day;
+      }
+      if (msg.from === "system") {
+        container.appendChild(el(`<div class="chat-system-msg">${escapeHtml(msg.text)}</div>`));
+        return;
+      }
+      // Bubble alignment follows the viewer's own role: an admin viewer
+      // sees their own ("admin") messages on the right; a dapur viewer
+      // sees their own ("dapur") messages on the right instead.
+      const isMine = state.appMode === "dapur" ? msg.from === "dapur" : msg.from === "admin";
+      const ticks = isMine
+        ? `<span class="chat-ticks ${msg.status === "read" ? "read" : ""}">${msg.status === "sent" ? "✓" : "✓✓"}</span>`
+        : "";
+      const row = el(`<div class="chat-bubble-row ${isMine ? "from-admin" : ""}">
+        <div class="chat-bubble ${isMine ? "admin" : "dapur"}">
+          ${!isMine ? `<span class="chat-sender">${escapeHtml(msg.name)}</span>` : ""}
+          <span class="chat-text">${escapeHtml(msg.text)}</span>
+          <span class="chat-meta">${escapeHtml(msg.time || "")}${ticks}</span>
+        </div>
+      </div>`);
+      container.appendChild(row);
+    });
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function openChatThread(sppgId) {
+    const sppg = sppgById(sppgId);
+    if (!sppg) return;
+    state.activeChatSppgId = sppgId;
+    const summary = chatSummaryFor(sppgId);
+    if (summary) summary.unread = 0;
+
+    const { kepala } = chatParticipants(sppg);
+    document.getElementById("chatThreadEmpty").hidden = true;
+    const activeEl = document.getElementById("chatThreadActive");
+    activeEl.hidden = false;
+    document.getElementById("chatHeaderAvatar").textContent = summary ? summary.avatar : chatInitials(sppg.name);
+    document.getElementById("chatHeaderName").textContent = state.appMode === "dapur" ? "Pusat Audit Nasional" : `Grup ${sppg.name}`;
+    document.getElementById("chatHeaderSub").textContent = state.appMode === "dapur"
+      ? `${kepala} & Tim Pusat · ${SPPG_TOTAL_DEMO} dapur terhubung`
+      : `${kepala} · ${sppg.city}, ${sppg.province}`;
+    document.getElementById("chatHeaderStatus").innerHTML = `<span class="dot dot-${sppg.status}"></span>${statusLabel(sppg.status)}`;
+    document.getElementById("chatTyping").hidden = true;
+
+    renderChatBubbles(generateChatMessages(sppg));
+    document.getElementById("chatShell").classList.add("chat-mobile-thread");
+    if (state.appMode === "dapur") updateChatNavBadge();
+    else renderChatThreadList();
+  }
+
+  function handleChatSend(e) {
+    e.preventDefault();
+    const input = document.getElementById("chatComposerInput");
+    const text = input.value.trim();
+    const sppgId = state.activeChatSppgId;
+    if (!text || !sppgId) return;
+    const sppg = sppgById(sppgId);
+    if (!sppg) return;
+    const messages = generateChatMessages(sppg);
+    const senderIsAdmin = state.appMode !== "dapur";
+    const now = new Date();
+    const time = now.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const { kepala, auditor } = chatParticipants(sppg);
+    const myMsg = {
+      id: `local-${Date.now()}`,
+      from: senderIsAdmin ? "admin" : "dapur",
+      name: senderIsAdmin ? auditor : kepala,
+      text,
+      time,
+      status: "sent",
+      day: "Hari ini",
+    };
+    messages.push(myMsg);
+    renderChatBubbles(messages);
+    input.value = "";
+
+    const summary = chatSummaryFor(sppgId);
+    if (summary) { summary.lastMessage = `${senderIsAdmin ? "Pusat" : kepala}: ${text}`; summary.minutesAgo = 0; }
+
+    // Simulasi status terkirim -> dibaca, lalu balasan otomatis dari lawan
+    // bicara — murni untuk mendemokan performa & alur grup chat (tidak ada
+    // server sungguhan di balik prototipe ini).
+    setTimeout(() => { myMsg.status = "delivered"; renderChatBubbles(messages); }, 500);
+    setTimeout(() => {
+      myMsg.status = "read";
+      renderChatBubbles(messages);
+      const typing = document.getElementById("chatTyping");
+      if (state.activeChatSppgId === sppgId) typing.hidden = false;
+      setTimeout(() => {
+        if (state.activeChatSppgId === sppgId) typing.hidden = true;
+        const reply = chatAutoReply(sppg, senderIsAdmin);
+        messages.push(reply);
+        if (state.activeChatSppgId === sppgId) renderChatBubbles(messages);
+        if (summary) { summary.lastMessage = `${reply.from === "admin" ? "Pusat" : kepala}: ${reply.text}`; summary.minutesAgo = 0; if (state.activeChatSppgId !== sppgId) summary.unread += 1; }
+        renderChatThreadList();
+      }, 1300 + Math.random() * 900);
+    }, 1250);
+  }
+
+  function initChatModule() {
+    if (!document.getElementById("view-chat")) return;
+    if (!chatWired) {
+      chatWired = true;
+      document.getElementById("chatComposerForm").addEventListener("submit", handleChatSend);
+      document.getElementById("chatSearchInput").addEventListener("input", debounce((e) => {
+        chatSearchQuery = e.target.value; chatListLimit = 40; renderChatThreadList();
+      }, 150));
+      document.querySelectorAll("#chatFilterTabs .chat-filter-tab").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll("#chatFilterTabs .chat-filter-tab").forEach((b) => b.classList.remove("is-active"));
+          btn.classList.add("is-active");
+          chatFilter = btn.dataset.filter;
+          chatListLimit = 40;
+          renderChatThreadList();
+        });
+      });
+      document.getElementById("chatBackBtn").addEventListener("click", () => {
+        document.getElementById("chatShell").classList.remove("chat-mobile-thread");
+      });
+    }
+
+    if (state.appMode === "dapur" && state.dapurSppgId) {
+      document.getElementById("chatShell").classList.add("chat-dapur-mode");
+      document.getElementById("chatListPane").hidden = true;
+      document.getElementById("chatViewSubtitle").textContent = "Grup chat dapur Anda dengan Pusat Audit Nasional — simulasi, bukan pesan sungguhan";
+      openChatThread(state.dapurSppgId);
+    } else {
+      document.getElementById("chatShell").classList.remove("chat-dapur-mode");
+      document.getElementById("chatListPane").hidden = false;
+      renderChatThreadList();
+    }
+  }
+
+  /* =======================================================================
      REPORTS — real simulated daily report + working CSV export (Blob)
      ======================================================================= */
   function renderReports() {
@@ -1575,6 +1780,7 @@
     renderRiskCenter();
     renderAuditSummary();
     renderAuditTable();
+    initChatModule();
     renderReports();
     renderAnalytics();
     renderSystemStatus();
@@ -1945,6 +2151,7 @@
     renderDapurCctv(sppg);
     renderDapurSensor(sppg);
     renderDapurAudit(sppg);
+    initChatModule();
     renderFavoriteList();
     renderDapurAnnouncements();
     renderDapurNetwork(sppg);
