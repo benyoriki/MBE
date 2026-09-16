@@ -1355,7 +1355,7 @@
       return;
     }
     shown.forEach((c) => {
-      const row = el(`<button type="button" class="chat-thread-item ${c.sppgId === state.activeChatSppgId ? "is-active" : ""}">
+      const row = el(`<button type="button" class="chat-thread-item ${c.sppgId === state.activeChatSppgId ? "is-active" : ""} ${c.unread ? "is-unread" : ""}">
         <span class="chat-avatar">${escapeHtml(c.avatar)}</span>
         <span class="chat-thread-meta">
           <span class="chat-thread-top">
@@ -1363,7 +1363,10 @@
             <span class="chat-thread-time">${chatRelativeTime(c.minutesAgo)}</span>
           </span>
           <span class="chat-thread-bottom">
-            <span class="chat-thread-preview"><span class="dot dot-${c.statusDot}"></span>${escapeHtml(c.lastMessage)}</span>
+            <span class="chat-thread-preview">
+              <span class="dot dot-${c.statusDot}"></span>
+              <span class="chat-thread-preview-text">${escapeHtml(c.lastMessage)}</span>
+            </span>
             ${c.unread ? `<span class="chat-unread-badge">${c.unread > 99 ? "99+" : c.unread}</span>` : ""}
           </span>
         </span>

@@ -56,12 +56,12 @@
 }
 .chat-filter-tab.is-active { background: var(--accent-green-dim); border-color: var(--accent-green); color: var(--accent-green); }
 
-.chat-thread-list { flex: 1; overflow-y: auto; min-height: 0; }
+.chat-thread-list { flex: 1; overflow-y: auto; min-height: 0; padding-bottom: 6px; }
 .chat-thread-item {
   display: flex;
-  gap: 10px;
+  gap: 11px;
   width: 100%;
-  padding: 10px 12px;
+  padding: 11px 14px;
   cursor: pointer;
   border: 0;
   border-bottom: 1px solid var(--border-soft);
@@ -69,22 +69,35 @@
   background: transparent;
   text-align: left;
   font-family: var(--font-body);
+  transition: background-color .12s ease;
 }
 .chat-thread-item:hover { background: var(--bg-2); }
 .chat-thread-item.is-active { background: var(--accent-green-dim); }
 .chat-avatar {
-  width: 40px; height: 40px; border-radius: 50%;
+  width: 42px; height: 42px; border-radius: 50%;
   background: var(--navy-700); color: var(--text-hi);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 13px; flex-shrink: 0;
 }
-.chat-thread-meta { flex: 1; min-width: 0; }
-.chat-thread-top, .chat-thread-bottom { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-.chat-thread-name { font-weight: 600; font-size: 13.5px; color: var(--text-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.chat-thread-time { font-size: 10.5px; color: var(--text-lo); flex-shrink: 0; }
-.chat-thread-bottom { margin-top: 3px; }
-.chat-thread-preview { font-size: 12px; color: var(--text-mid); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px; min-width: 0; }
+.chat-thread-meta { flex: 1 1 auto; min-width: 0; }
+.chat-thread-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.chat-thread-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 4px; }
+.chat-thread-name { flex: 1 1 auto; min-width: 0; font-weight: 600; font-size: 13.5px; color: var(--text-hi); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chat-thread-time { flex-shrink: 0; font-size: 10.5px; color: var(--text-lo); }
+/* .chat-thread-preview is a flex row (status dot + message text); the
+   ellipsis truncation has to live on the inner text span, not on this
+   flex container — text-overflow doesn't reliably truncate mixed
+   inline content (dot + text) sitting directly inside a flex box, which
+   was cutting messages off with no "…" and no breathing room before the
+   unread badge. */
+.chat-thread-preview { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; }
 .chat-thread-preview .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.chat-thread-preview-text {
+  flex: 1 1 auto; min-width: 0; font-size: 12px; color: var(--text-mid);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.chat-thread-item.is-unread .chat-thread-preview-text { color: var(--text-hi); font-weight: 600; }
+.chat-thread-item.is-unread .chat-thread-name { color: var(--text-hi); }
 .chat-unread-badge {
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent-green); color: #04250b;
